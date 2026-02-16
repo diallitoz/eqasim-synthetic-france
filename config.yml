@@ -2,34 +2,94 @@
 ## based on the synpp package
 
 # This is the path to a directory where the pipeline can store temporary data
-working_directory: /path/to/my/cache
+working_directory: /work/home/simulations/matsim/cache
 
 # This section defines which parts of the pipeline should be run
 run:
   - synthesis.output # To create the output population in the output_path (see below)
+  #- documentation.paper
   #- matsim.output # Uncomment, if you want to run the full simulation (you'll need Java for that)
 
 # Here the configuraiton of the pipeline starts
 config:
   # Some general configuration
-  processes: 4
+  processes: 24
 
-  # Define whether to use ENTD or EGT as the household travel survey (HTS)
-  hts: entd
+  # Define whether to use ENTD, EMP or EGT as the household travel survey (HTS)
+  hts: mobisurvstd
 
   # Define sampling rate and random seed for the output population
   sampling_rate: 0.001
   random_seed: 1234
 
   # Paths to the input data and where the output should be stored
-  data_path: /path/to/my/data
-  output_path: /path/to/my/output
+  data_path:  /work/home/simulations/matsim/data
+  output_path: /work/home/simulations/matsim/national/output_01p/4.mobisurvstd
 
   # Only interesting if you run the simulation
-  java_memory: 14G
+  java_memory: 92G
 
   # Activate if you want to run mode choice
   mode_choice: false
 
   # Uncomment to use the bhepop2 package for attributing income
   # income_assignation_method: bhepop2
+
+
+  # National settings
+  output_prefix: national_mobisurvstd_
+  regions: []
+  gtfs_path: gtfs_idf
+  osm_path: osm_idf
+  ban_path: ban_national
+  bdtopo_path: bdtopo_national
+
+  iris_path: iris_2024
+
+  java_binary: /work/home/install/jdk-21/bin/java
+  osmosis_binary: /work/home/install/osmosis.0.48/osmosis
+  maven_binary: /work/home/install/apache-maven-3.8.4/bin/mvn
+  eqasim_path: /work/home/install/ile_de_france-1.5.0.jar
+  # eqasim_tag: None
+  pt2matsim_path: /work/home/install/pt2matsim-21.4-shaded.jar
+
+  export_detailed_network: True
+
+  exclude_no_employee: true
+
+  home_location_source: tiles
+
+  #education_location_source: weighted
+  #education_location_source: addresses
+  #education_file: education/education_addresses.geojson
+
+  paper_path: /work/home/simulations/matsim/national/output_01p/3.docs/2.mobsurvstd
+  acquisition_sample_size: 5
+
+  mobisurvstd.path: mobisurvstd
+
+  mobisurvstd_skip_spatial: true
+
+  filter_hts: False # For not remove EMP trips where the origin / destination départements are unknown
+
+  mobisurvstd_surveys:
+
+      - name: egt_idf
+        path: surveys/egt
+        survey_type: egt2010
+        priority_departments: ["75","77","78","91","92","93","94","95"]
+
+      #- name: edgt_lyon
+      #  path: surveys/edgt_lyon
+      #  survey_type: edgt
+      #  priority_departments: ["69"]
+
+      #- name: emd_lille
+      #  path: surveys/emd_lille
+      #  survey_type: emd
+      #  priority_departments: ["59"]
+
+      - name: emp_national
+        path: surveys/emp
+        survey_type: emp2019
+        priority_departments: []

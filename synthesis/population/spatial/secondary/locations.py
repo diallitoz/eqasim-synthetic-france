@@ -27,6 +27,17 @@ def prepare_locations(context):
     df_work, df_education = context.stage("synthesis.population.spatial.primary.locations")
     crs = df_home.crs
 
+    #print(df_home)
+    #print("Home", df_home[df_home["person_id"] == 43646687])
+
+    #print(df_work)
+    #print("Work", df_work[df_work["person_id"] == 43646687])
+
+    #print(df_education)
+    #print("Education", df_education[df_education["person_id"] == 43646687])
+
+    #stop
+
     df_home = df_home.rename(columns = { "geometry": "home" })
     df_work = df_work.rename(columns = { "geometry": "work" })
     df_education = df_education.rename(columns = { "geometry": "education" })
@@ -36,7 +47,10 @@ def prepare_locations(context):
     df_locations = pd.merge(df_locations, df_work[["person_id", "work"]], how = "left", on = "person_id")
     df_locations = pd.merge(df_locations, df_education[["person_id", "education"]], how = "left", on = "person_id")
 
-    return df_locations[["person_id", "home", "work", "education"]].sort_values(by = "person_id"), crs
+    print("Locations \n", df_locations[df_locations["person_id"] == 43646687])
+
+    #return df_locations[["person_id", "home", "work", "education"]].sort_values(by = "person_id"), crs
+    return df_locations.sort_values(by = "person_id"), crs
 
 def prepare_destinations(context):
     df_locations = context.stage("synthesis.locations.secondary")
@@ -78,6 +92,15 @@ def execute(context):
     df_trips = context.stage("synthesis.population.trips").sort_values(by = ["person_id", "trip_index"])
     df_trips["travel_time"] = df_trips["arrival_time"] - df_trips["departure_time"]
     df_primary, crs = prepare_locations(context)
+    print(df_primary)
+    print(df_primary.isna().mean())
+    print(df_primary[df_primary["person_id"] == 43646687])
+    print(df_trips[df_trips["person_id"] == 43646687])
+
+
+    print(df_primary[df_primary["person_id"] == 51637410])
+    print(df_trips[df_trips["person_id"] == 51637410])
+    #stop
 
     # Prepare data
     distance_distributions = context.stage("synthesis.population.spatial.secondary.distance_distributions")

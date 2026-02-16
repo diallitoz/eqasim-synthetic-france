@@ -47,6 +47,12 @@ def execute(context):
     assert (df_trips["departure_time"] >= 0.0).all()
     assert (df_trips["arrival_time"] >= 0.0).all()
 
+    print(df_trips)
+
+    print(df_trips[df_trips["person_id"] == 43646687])
+
+    #stop
+
     return df_trips[[
         "person_id", "trip_index",
         "departure_time", "arrival_time",

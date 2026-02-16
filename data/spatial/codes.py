@@ -13,8 +13,8 @@ def configure(context):
 
     context.config("regions", [11])
     context.config("departments", [])
-    context.config("codes_path", "codes_2023/reference_IRIS_geo2023.zip")
-    context.config("codes_xlsx", "reference_IRIS_geo2023.xlsx")
+    context.config("codes_path", "codes_2024/reference_IRIS_geo2024.zip")
+    context.config("codes_xlsx", "reference_IRIS_geo2024.xlsx")
 
 def execute(context):
     # Load IRIS registry
@@ -22,13 +22,13 @@ def execute(context):
         "{}/{}".format(context.config("data_path"), context.config("codes_path"))) as archive:
         with archive.open(context.config("codes_xlsx")) as f:
             df_codes = pd.read_excel(f,
-                skiprows = 5, sheet_name = "Emboitements_IRIS"
+                skiprows = 5, sheet_name = "Emboitements_IRIS",dtype={"CODE_IRIS":str,"DEPCOM":str}
             )[["CODE_IRIS", "DEPCOM", "DEP", "REG"]].rename(columns = {
                 "CODE_IRIS": "iris_id",
                 "DEPCOM": "commune_id",
                 "DEP": "departement_id",
                 "REG": "region_id"
-            })
+            }).fillna('0')
 
     df_codes["iris_id"] = df_codes["iris_id"].astype("category")
     df_codes["commune_id"] = df_codes["commune_id"].astype("category")
@@ -45,6 +45,16 @@ def execute(context):
     if len(requested_departments) > 0:
         df_codes = df_codes[df_codes["departement_id"].isin(requested_departments)]
 
+    # Focus on only French metropolitain without 
+    # Guadeloupe (971), Martinique (972), Guyane (973), La Réunion (974)
+    # Mayotte (976), Corse-du-Sud (2A), Haute-Corse (2B), Nouvelle-Calédonie (988)
+    # Tous les departements inconnus (0)
+    all_iris = len(set(df_codes["iris_id"].unique()))
+    no_requested_departments = ["971", "972", "973", "974", "976", "2A", "2B", "988", "0"]
+    df_codes = df_codes[~df_codes["departement_id"].isin(no_requested_departments)]
+    only_metro_iris = len(set(df_codes["iris_id"].unique()))
+    print("Number no metropolitain IRIS", all_iris - only_metro_iris)
+        
     df_codes["iris_id"] = df_codes["iris_id"].cat.remove_unused_categories()
     df_codes["commune_id"] = df_codes["commune_id"].cat.remove_unused_categories()
     df_codes["departement_id"] = df_codes["departement_id"].cat.remove_unused_categories()

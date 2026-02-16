@@ -14,6 +14,8 @@ def configure(context):
         context.stage("data.hts.edgt_44.reweighted", alias = "hts")
     elif hts == "emp":
         context.stage("data.hts.emp.reweighted", alias = "hts")
+    elif hts == "mobisurvstd":
+        context.stage("data.hts.mobisurvstd.filtered", alias = "hts")
     else:
         raise RuntimeError("Unknown HTS: %s" % hts)
 

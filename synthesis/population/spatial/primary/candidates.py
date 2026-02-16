@@ -26,13 +26,29 @@ def sample_destination_municipalities(context, arguments):
     origin_id, count, random_seed = arguments
     df_od = context.data("df_od")
 
+    #print("total df_od", df_od["weight"].values.sum())
+
+    #print("total education", df_education_od["weight"].values.sum())
+    #stop
+
     # Prepare state
     random = np.random.RandomState(random_seed)
     df_od = df_od[df_od["origin_id"] == origin_id].copy()
 
     # Sample destinations
-    df_od["count"] = random.multinomial(count, df_od["weight"].values)
-    df_od = df_od[df_od["count"] > 0]
+    if(df_od["weight"].values.sum() > 1.01) :
+        
+        print("total df_od", df_od["weight"].values.sum(), "pour la commune : ", origin_id, "taille destination :", len(df_od))
+        # Sample destinations
+        weights = df_od["weight"].values
+        weights = weights / weights.sum()
+        df_od["count"] = random.multinomial(count, weights)
+        df_od = df_od[df_od["count"] > 0]
+
+        #raise RuntimeError( f"Sum proba > 1")
+    else :
+        df_od["count"] = random.multinomial(count, df_od["weight"].values)
+        df_od = df_od[df_od["count"] > 0]
 
     context.progress.update()
     return df_od[["origin_id", "destination_id", "count"]]
@@ -127,6 +143,7 @@ def execute(context):
     # Prepare spatial data
     df_work_od, df_education_od = context.stage("data.od.weighted")
 
+
     # Sampling
     random = np.random.RandomState(context.config("random_seed"))
 
@@ -148,7 +165,8 @@ def execute(context):
                     df_education_od[df_education_od["age_range"]==prefix],df_locations[df_locations["education_type"].isin(education_type)],prefix)
             )
         df_education = pd.concat(df_education)
-
+    print(df_education)
+    #stop
     return dict(
         work_candidates = df_work,
         education_candidates = df_education,
