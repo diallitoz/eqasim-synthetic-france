@@ -44,6 +44,7 @@ def execute(context):
     std_survey = context.stage("data.hts.mobisurvstd.raw_multi")
 
     df_households = std_survey.households.select(
+        "source_survey",
         "household_id",
         "trips_weekday",
         "home_insee_density",
@@ -70,8 +71,10 @@ def execute(context):
         assert (
             col in std_survey.persons.columns
         ), f"Column {col} is not a valid column name for MobiSurvStd persons"
-
+    
+    """
     df_persons = std_survey.persons.select(
+        "source_survey",
         "person_id",
         "household_id",
         "is_surveyed",
@@ -112,11 +115,102 @@ def execute(context):
         .otherwise("pcs_group_code")
         .fill_null(8),
     )
-    if df_persons["person_weight"].is_null().all():
-        # For EMP 2019, person weight is unknown, we use trip weight instead.
-        df_persons = df_persons.with_columns(person_weight="trip_weight")
+    """
+    #if df_persons["person_weight"].is_null().all():
+    #   # For EMP 2019, person weight is unknown, we use trip weight instead.
+    #    df_persons = df_persons.with_columns(person_weight="trip_weight")
+    
+    extra_cols = []
+    if "departement_id" in std_survey.persons.columns:
+        extra_cols.append("departement_id")
+    if "is_passenger" in std_survey.persons.columns:
+        extra_cols.append("is_passenger")
+    if "source_survey" in std_survey.persons.columns:
+        extra_cols.append("source_survey")
+
+    df_persons = std_survey.persons.select(
+        "person_id",
+        "household_id",
+        "is_surveyed",
+        "age",
+        "age_class",
+        *extra_cols,
+
+        sex=pl.when("woman")
+            .then(pl.lit("female"))
+            .otherwise(pl.lit("male"))
+            .cast(pl.Categorical),
+
+        employed=pl.when(pl.col("age") < 5)
+            .then(False)
+            .otherwise(pl.col("professional_occupation") == "worker")
+            .fill_null(pl.col("pcs_group_code") <= 6)
+            .fill_null(False),
+
+        studies=pl.when(pl.col("age") < 5)
+            .then(True)
+            .otherwise(pl.col("professional_occupation") == "student")
+            .fill_null(False),
+
+        has_license=(
+            pl.col("has_driving_license").eq_missing("yes")
+            | pl.col("has_motorcycle_driving_license").eq_missing("yes")
+        ),
+
+        has_pt_subscription=pl.col("has_public_transit_subscription").fill_null(False),
+
+        number_of_trips="nb_trips",
+
+        person_weight="sample_weight_all",
+        trip_weight="sample_weight_surveyed",
+
+        socioprofessional_class=pl.when(
+            pl.col("detailed_professional_occupation") == "other:retired"
+        ).then(7)
+        .when(pl.col("professional_occupation") != "worker")
+        .then(8)
+        .otherwise("pcs_group_code")
+        .fill_null(8),
+    )
+
+
+    df_persons = df_persons.with_columns(
+    person_weight = pl.when(
+        pl.col("person_weight").is_null() &
+        (pl.col("source_survey") == "emp_national")
+    ).then(pl.col("trip_weight"))
+     .otherwise(pl.col("person_weight"))
+    )
+
+    # --------------------------------------------------
+    # Weights Renormalisation
+    # --------------------------------------------------
+
+    if "source_survey" in df_persons.columns:
+
+        survey_means = (
+    df_persons
+    .group_by("source_survey")
+    .agg(pl.col("person_weight").mean().alias("survey_mean_weight"))
+    )
+
+    df_persons = df_persons.join(survey_means, on="source_survey")
+
+    df_persons = df_persons.with_columns(
+        (pl.col("person_weight") / pl.col("survey_mean_weight"))
+        .alias("person_weight_norm")
+    )
+
+    df_persons = (
+        df_persons
+        .drop("person_weight", "survey_mean_weight")
+        .rename({"person_weight_norm": "person_weight"})
+    )
+
+    print("INFO | Weights renormalized by survey")
 
     df_trips = std_survey.trips.select(
+        "source_survey",
         "trip_id",
         "person_id",
         "household_id",
@@ -191,4 +285,28 @@ def execute(context):
             )
         )
     df_households = df_households.drop("home_insee_density")
+
+    print("\nWeight diagnostics:")
+    print(df_persons.columns)
+    print(
+        df_persons.group_by("source_survey")
+        .agg(pl.mean("person_weight"))
+        )
+
+    print(
+        df_persons.group_by("source_survey")
+        .agg(pl.min("person_weight"))
+        )
+
+    print(
+        df_persons.group_by("source_survey")
+        .agg(pl.max("person_weight"))
+        )
+
+    print(
+        df_persons.group_by("source_survey")
+        .agg(pl.count())
+        )
+    
+
     return df_households, df_persons, df_trips

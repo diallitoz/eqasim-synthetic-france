@@ -3,15 +3,20 @@ import itertools
 import numpy as np
 import pandas as pd
 import numba
+from pathlib import Path
 
 import data.hts.egt.cleaned
 import data.hts.entd.cleaned
 
-import multiprocessing as mp
-
 """
 This stage attaches obervations from the household travel survey to the synthetic
 population sample. This is done by statistical matching.
+
+Hierarchical statistical matching with:
+- intra-survey priority
+- inter-survey fallback
+- weight stabilization
+- matching diagnostics logs
 """
 
 INCOME_CLASS = {
@@ -28,24 +33,29 @@ def configure(context):
     context.config("processes")
     context.config("random_seed")
     context.config("matching_minimum_observations", 20)
+    context.config("matching_minimum_observations_fallback", 5)
     context.config("matching_attributes", DEFAULT_MATCHING_ATTRIBUTES)
+    context.config("matching_log_path")
 
     context.stage("synthesis.population.sampled")
     context.stage("synthesis.population.income.selected")
+    context.stage("data.hts.selected", alias="hts")
 
-    hts = context.config("hts")
-    context.stage("data.hts.selected", alias = "hts")
-
-@numba.jit(nopython = True) # Already parallelized parallel = True)
+@numba.jit(nopython=True) # Already parallelized parallel = True)
 def sample_indices(uniform, cdf, selected_indices):
-    indices = np.arange(len(uniform))
-
+    out = np.empty(len(uniform), dtype=np.int64)
     for i, u in enumerate(uniform):
-        indices[i] = np.count_nonzero(cdf < u)
+        out[i] = selected_indices[np.searchsorted(cdf, u)]
+    return out
 
-    return selected_indices[indices]
+# ------------------------------------------------------------------
+# MATCHING ENGINE
+# ------------------------------------------------------------------
 
-def statistical_matching(progress, df_source, source_identifier, weight, df_target, target_identifier, columns, random_seed = 0, minimum_observations = 0):
+def statistical_matching(progress, df_source, source_identifier, weight,
+                         df_target, target_identifier, columns,
+                         random_seed=0, minimum_observations=0):
+
     random = np.random.RandomState(random_seed)
 
     # Reduce data frames
@@ -53,176 +63,206 @@ def statistical_matching(progress, df_source, source_identifier, weight, df_targ
     df_target = df_target[[target_identifier] + columns].copy()
 
     # Sort data frames
-    df_source = df_source.sort_values(by = columns)
-    df_target = df_target.sort_values(by = columns)
+    df_source = df_source.sort_values(columns)
+    df_target = df_target.sort_values(columns)
 
-    # Find unique values for all columns
-    unique_values = {}
-
-    for column in columns:
-        unique_values[column] = list(sorted(set(df_source[column].unique()) | set(df_target[column].unique())))
-
-    # Generate filters for all columns and values
-    source_filters, target_filters = {}, {}
-
-    for column, column_unique_values in unique_values.items():
-        source_filters[column] = [df_source[column].values == value for value in column_unique_values]
-        target_filters[column] = [df_target[column].values == value for value in column_unique_values]
+    unique_values = {
+        c: list(sorted(set(df_source[c].unique()) | set(df_target[c].unique())))
+        for c in columns
+    }
 
     # Define search order
-    source_filters = [source_filters[column] for column in columns]
-    target_filters = [target_filters[column] for column in columns]
+    source_filters = [
+        [df_source[c].values == v for v in unique_values[c]]
+        for c in columns
+    ]
+    target_filters = [
+        [df_target[c].values == v for v in unique_values[c]]
+        for c in columns
+    ]
 
     # Perform matching
-    weights = df_source[weight].values
-    assigned_indices = np.ones((len(df_target),), dtype = int) * -1
-    unassigned_mask = np.ones((len(df_target),), dtype = bool)
-    assigned_levels = np.ones((len(df_target),), dtype = int) * -1
-    uniform = random.random_sample(size = (len(df_target),))
+    weights = df_source[weight].values.astype(float)
+    if weights.mean() > 0:
+        weights /= weights.mean()
 
-    column_indices = [np.arange(len(unique_values[column])) for column in columns]
+    assigned_indices = np.full(len(df_target), -1, dtype=int)
+    assigned_levels = np.full(len(df_target), -1, dtype=int)
+    unassigned = np.ones(len(df_target), dtype=bool)
+    uniform = random.random_sample(len(df_target))
 
-    for level in range(1, len(column_indices) + 1)[::-1]:
-        level_column_indices = column_indices[:level]
+    column_indices = [np.arange(len(unique_values[c])) for c in columns]
 
-        if np.count_nonzero(unassigned_mask) > 0:
-            for column_index in itertools.product(*level_column_indices):
-                f_source = np.logical_and.reduce([source_filters[i][k] for i, k in enumerate(column_index)])
-                f_target = np.logical_and.reduce([target_filters[i][k] for i, k in enumerate(column_index)] + [unassigned_mask])
+    # hierarchical relaxation of attributes
+    for level in range(len(columns), 0, -1):
+        if not unassigned.any():
+            break
 
-                selected_indices = np.nonzero(f_source)[0]
-                requested_samples = np.count_nonzero(f_target)
+        for combo in itertools.product(*column_indices[:level]):
+            f_src = np.logical_and.reduce(
+                [source_filters[i][k] for i, k in enumerate(combo)]
+            )
+            f_tgt = np.logical_and.reduce(
+                [target_filters[i][k] for i, k in enumerate(combo)] + [unassigned]
+            )
 
-                if requested_samples == 0:
-                    continue
+            if not f_tgt.any():
+                continue
 
-                if len(selected_indices) < minimum_observations:
-                    continue
+            idx = np.where(f_src)[0]
+            if len(idx) < minimum_observations:
+                continue
 
-                selected_weights = weights[f_source]
-                cdf = np.cumsum(selected_weights)
-                cdf /= cdf[-1]
+            w = weights[f_src]
+            cdf = np.cumsum(w)
+            cdf /= cdf[-1]
 
-                assigned_indices[f_target] = sample_indices(uniform[f_target], cdf, selected_indices)
-                assigned_levels[f_target] = level
-                unassigned_mask[f_target] = False
+            picked = sample_indices(uniform[f_tgt], cdf, idx)
+            assigned_indices[f_tgt] = picked
+            assigned_levels[f_tgt] = level
+            unassigned[f_tgt] = False
 
-                progress.update(np.count_nonzero(f_target))
+            progress.update(int(f_tgt.sum()))
 
-    # Randomly assign unmatched observations
-    cdf = np.cumsum(weights)
-    cdf /= cdf[-1]
+    # global fallback
+    if unassigned.any():
+        cdf = np.cumsum(weights)
+        cdf /= cdf[-1]
+        assigned_indices[unassigned] = sample_indices(
+            uniform[unassigned], cdf, np.arange(len(weights))
+        )
+        assigned_levels[unassigned] = 0
+        progress.update(int(unassigned.sum()))
 
-    assigned_indices[unassigned_mask] = sample_indices(uniform[unassigned_mask], cdf, np.arange(len(weights)))
-    assigned_levels[unassigned_mask] = 0
-
-    progress.update(np.count_nonzero(unassigned_mask))
-
-    if np.count_nonzero(unassigned_mask) > 0:
-        raise RuntimeError("Some target observations could not be matched. Minimum observations configured too high?")
-
-    assert np.count_nonzero(unassigned_mask) == 0
-    assert np.count_nonzero(assigned_indices == -1) == 0
-
-    # Write back indices
     df_target[source_identifier] = df_source[source_identifier].values[assigned_indices]
-    df_target = df_target[[target_identifier, source_identifier]]
+    return df_target[[target_identifier, source_identifier]], assigned_levels
 
-    return df_target, assigned_levels
+# ------------------------------------------------------------------
+# PARALLEL WRAPPER
+# ------------------------------------------------------------------
 
-def _run_parallel_statistical_matching(context, args):
-    # Pass arguments
-    df_target, random_seed = args
+def _worker(context, args):
+    df_target, seed = args
+    return statistical_matching(
+        context.progress,
+        context.data("df_source"),
+        context.data("source_identifier"),
+        context.data("weight"),
+        df_target,
+        context.data("target_identifier"),
+        context.data("columns"),
+        seed,
+        context.data("minimum_observations"),
+    )
 
-    # Pass data
-    df_source = context.data("df_source")
-    source_identifier = context.data("source_identifier")
-    weight = context.data("weight")
-    target_identifier = context.data("target_identifier")
-    columns = context.data("columns")
-    minimum_observations = context.data("minimum_observations")
+def parallel_match(context, df_source, source_id, weight,
+                   df_target, target_id, columns, min_obs):
 
-    return statistical_matching(context.progress, df_source, source_identifier, weight, df_target, target_identifier, columns, random_seed, minimum_observations)
+    rnd = np.random.RandomState(context.config("random_seed"))
+    chunks = np.array_split(df_target, context.config("processes"))
 
-def parallel_statistical_matching(context, df_source, source_identifier, weight, df_target, target_identifier, columns, minimum_observations = 0):
-    random_seed = context.config("random_seed")
-    processes = context.config("processes")
-
-    random = np.random.RandomState(random_seed)
-    chunks = np.array_split(df_target, processes)
-
-    with context.progress(label = "Statistical matching ...", total = len(df_target)):
+    with context.progress(total=len(df_target), label="Matching"):
         with context.parallel({
-            "df_source": df_source, "source_identifier": source_identifier, "weight": weight,
-            "target_identifier": target_identifier, "columns": columns,
-            "minimum_observations": minimum_observations
-        }) as parallel:
-                random_seeds = random.randint(10000, size = len(chunks))
-                results = parallel.map(_run_parallel_statistical_matching, zip(chunks, random_seeds))
+            "df_source": df_source,
+            "source_identifier": source_id,
+            "weight": weight,
+            "target_identifier": target_id,
+            "columns": columns,
+            "minimum_observations": min_obs
+        }) as pool:
+            seeds = rnd.randint(1_000_000, size=len(chunks))
+            res = pool.map(_worker, zip(chunks, seeds))
 
-                levels = np.hstack([r[1] for r in results])
-                df_target = pd.concat([r[0] for r in results])
+    return pd.concat([r[0] for r in res]), np.hstack([r[1] for r in res])
 
-                return df_target, levels
+# ------------------------------------------------------------------
+# HIERARCHICAL MATCHING
+# ------------------------------------------------------------------
+
+def hierarchical_matching(context, df_source, df_target, columns):
+
+    main_min = context.config("matching_minimum_observations")
+    fb_min = context.config("matching_minimum_observations_fallback")
+
+    if "source_survey" not in df_source.columns:
+        return parallel_match(context, df_source, "hts_id",
+                              "person_weight", df_target,
+                              "person_id", columns, main_min)
+
+    assignments = []
+    levels_all = []
+
+    for survey, src_sub in df_source.groupby("source_survey"):
+        tgt_sub = df_target[df_target["departement_id"].isin(src_sub["departement_id"].unique())]
+        if len(tgt_sub) == 0:
+            continue
+
+        try:
+            a, l = parallel_match(context, src_sub, "hts_id",
+                                  "person_weight", tgt_sub,
+                                  "person_id", columns, main_min)
+        except Exception:
+            a, l = parallel_match(context, df_source, "hts_id",
+                                  "person_weight", tgt_sub,
+                                  "person_id", columns, fb_min)
+
+        assignments.append(a)
+        levels_all.append(l)
+
+    return pd.concat(assignments), np.hstack(levels_all)
+
 
 def execute(context):
-    hts = context.config("hts")
 
-    # Load data
-    df_source_households, df_source_persons, df_source_trips = context.stage("hts")
-    df_source = pd.merge(df_source_persons, df_source_households)
+    df_hh, df_pp, df_tt = context.stage("hts")
+    df_source = pd.merge(df_pp, df_hh)
+    df_source = df_source.rename(columns={"person_id": "hts_id"})
 
     df_target = context.stage("synthesis.population.sampled")
 
     columns = context.config("matching_attributes")
 
-    try:
-        default_index = columns.index("*default*")
-        columns[default_index:default_index + 1] = DEFAULT_MATCHING_ATTRIBUTES
-    except ValueError: pass
-
-    # Define matching attributes
     AGE_BOUNDARIES = [14, 29, 44, 59, 74, 1000]
-
     if "age_class" in columns:
-        df_target["age_class"] = np.digitize(df_target["age"], AGE_BOUNDARIES, right = True)
-        df_source["age_class"] = np.digitize(df_source["age"], AGE_BOUNDARIES, right = True)
-
-    if "income_class" in columns:
-        df_income = context.stage("synthesis.population.income.selected")[["household_id", "household_income"]]
-
-        df_target = pd.merge(df_target, df_income)
-        df_target["income_class"] = INCOME_CLASS[hts](df_target)
+        df_target["age_class"] = np.digitize(df_target["age"], AGE_BOUNDARIES, True)
+        df_source["age_class"] = np.digitize(df_source["age"], AGE_BOUNDARIES, True)
 
     if "any_cars" in columns:
         df_target["any_cars"] = df_target["number_of_vehicles"] > 0
         df_source["any_cars"] = df_source["number_of_vehicles"] > 0
 
-    # Perform statistical matching
-    df_source = df_source.rename(columns = { "person_id": "hts_id" })
+    df_assignment, levels = hierarchical_matching(
+        context, df_source, df_target, columns
+    )
 
-    for column in columns:
-        if not column in df_source:
-            raise RuntimeError("Attribute not available in source (HTS) for matching: {}".format(column))
+    # ------------------------------------------------------------------
+    # LOGGING
+    # ------------------------------------------------------------------
 
-        if not column in df_target:
-            raise RuntimeError("Attribute not available in target (census) for matching: {}".format(column))
+    log_path = Path(context.config("matching_log_path"))
+    log_path.mkdir(parents=True, exist_ok=True)
 
-    df_assignment, levels = parallel_statistical_matching(
-        context,
-        df_source, "hts_id", "person_weight",
-        df_target, "person_id",
-        columns,
-        minimum_observations = context.config("matching_minimum_observations"))
-
-    df_target = pd.merge(df_target, df_assignment, on = "person_id")
-    assert len(df_target) == len(df_assignment)
-
-    context.set_info("matched_counts", {
-        count: np.count_nonzero(levels >= count) for count in range(len(columns) + 1)
+    levels_df = pd.DataFrame({
+    "person_id": df_assignment["person_id"].values,
+    "matching_level": levels
     })
 
-    for count in range(len(columns) + 1):
-        print("%d matched levels:" % count, np.count_nonzero(levels >= count), "%.2f%%" % (100 * np.count_nonzero(levels >= count) / len(df_target),))
+    log = df_target.merge(levels_df, on="person_id", how="left")
 
+    log["matching_level"].value_counts().sort_index().to_csv(
+        log_path / "levels.csv"
+    )
+
+    log[["person_id", "matching_level"]].to_csv(
+    log_path / "individual.csv",
+    index=False
+    )
+
+    if "departement_id" in log:
+        log.groupby(["departement_id","matching_level"]).size().unstack(fill_value=0)\
+            .to_csv(log_path / "by_dep.csv")
+
+    # ------------------------------------------------------------------
+
+    df_target = df_target.merge(df_assignment, on="person_id")
     return df_target[["person_id", "hts_id"]]

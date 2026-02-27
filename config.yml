@@ -71,6 +71,9 @@ config:
   mobisurvstd_skip_spatial: true
 
   filter_hts: False # For not remove EMP trips where the origin / destination départements are unknown
+  matching_attributes: [
+    "departement_id", "age_class", "socioprofessional_class", "any_cars", "sex"
+    ]
 
   mobisurvstd_surveys:
 
@@ -93,3 +96,5 @@ config:
         path: surveys/emp
         survey_type: emp2019
         priority_departments: []
+
+  matching_log_path: /work/home/simulations/matsim/national/output_01p/4.mobisurvstd
