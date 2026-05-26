@@ -53,7 +53,7 @@ def execute(context):
 
         if geometry_path is not None:
             df_buildings = pyogrio.read_dataframe(geometry_path, layer = "batiment", columns = [
-                "cleabs", "nombre_de_logements"]).to_crs("EPSG:2154")
+                "cleabs", "nombre_de_logements", "usage_1"]).to_crs("EPSG:2154")
             
             df_buildings["building_id"] = df_buildings["cleabs"].apply(lambda x: int(x[8:]))
             df_buildings["housing"] = df_buildings["nombre_de_logements"].fillna(0).astype(int)
@@ -62,11 +62,6 @@ def execute(context):
             df_buildings = df_buildings.set_geometry("centroid")
 
             print("  Filtering ...")
-
-            initial_count = len(df_buildings)
-            df_buildings = df_buildings[df_buildings["housing"] > 0]
-            final_count = len(df_buildings)
-            print("    {}/{} filtered by dwellings".format(initial_count - final_count, initial_count))
 
             initial_count = len(df_buildings)
             df_buildings = df_buildings[~df_buildings["building_id"].isin(known_ids)]
@@ -78,6 +73,19 @@ def execute(context):
             final_count = len(df_buildings)
             print("    {}/{} filtered spatially".format(initial_count - final_count, initial_count))
 
+            
+            #print(df_buildings["usage_1"].value_counts())
+            is_dept_08 = (df_buildings["departement_id"] == "08")
+            mask_08 = is_dept_08 & df_buildings["usage_1"].isin(["R\u00e9sidentiel", "Indiff\u00e9renci\u00e9"])
+            #df_buildings = df_buildings[df_buildings["usage_1"].isin(["R\u00e9sidentiel", "Indiff\u00e9renci\u00e9"])]
+            #Pour les autres : Logements > 0
+            mask_others = ~is_dept_08 & (df_buildings["housing"] > 0)
+            initial_count = len(df_buildings)
+            #df_buildings = df_buildings[df_buildings["housing"] > 0]
+            df_buildings = df_buildings[mask_08 | mask_others]
+            final_count = len(df_buildings)
+            print("    {}/{} filtered by dwellings".format(initial_count - final_count, initial_count))
+            
             df_buildings["department_id"] = df_buildings["departement_id"]
             df_buildings = df_buildings.set_geometry("geometry")
 
@@ -89,6 +97,9 @@ def execute(context):
     df_bdtopo = pd.concat(df_bdtopo)
 
     for department_id in df_departments["departement_id"].values:
+        if(np.count_nonzero(df_bdtopo["department_id"] == department_id) > 0):
+            print("Departement non conforme", department_id , np.count_nonzero(df_bdtopo["department_id"] == department_id))
+            print(df_bdtopo["department_id"].value_counts().head(10))
         assert np.count_nonzero(df_bdtopo["department_id"] == department_id) > 0
 
     return df_bdtopo[["building_id", "housing", "geometry"]]

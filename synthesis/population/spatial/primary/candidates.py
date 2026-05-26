@@ -3,10 +3,8 @@ import numpy as np
 
 def configure(context):
     context.stage("data.od.weighted")
-
     context.stage("synthesis.locations.education")
     context.stage("synthesis.locations.work")
-
     context.stage("synthesis.population.spatial.home.zones")
     context.stage("synthesis.population.enriched")
     context.stage("synthesis.population.trips")
@@ -21,98 +19,95 @@ EDUCATION_MAPPING = {
     "high_school": ["C3"],
     "higher_education": ["C4", "C5", "C6"]}
 
-def sample_destination_municipalities(context, arguments):
-    # Load data
-    origin_id, count, random_seed = arguments
-    df_od = context.data("df_od")
+def process(context, purpose, random, df_persons, df_od, df_locations, step_name):
+    print(f"Vectorized Processing for {step_name}")
 
-    # Prepare state
-    random = np.random.default_rng(random_seed)
-    df_od = df_od[df_od["origin_id"] == origin_id].copy()
+    df_persons_active = df_persons[df_persons["has_%s_trip" % purpose]]
+    if len(df_persons_active) == 0:
+        return pd.DataFrame(columns=["origin_id", "destination_id", "location_id"])
 
-    # Sample destinations
-    weights = df_od["weight"].values.astype(np.float64) # conversion for multinomial
-    weights = weights / np.sum(weights)
-
-    df_od["count"] = random.multinomial(count, weights)
-    df_od = df_od[df_od["count"] > 0]
-
-    context.progress.update()
-    return df_od[["origin_id", "destination_id", "count"]]
-
-def sample_locations(context, arguments):
-    # Load data
-    destination_id, random_seed = arguments
-    df_locations, df_flow = context.data("df_locations"), context.data("df_flow")
-
-    # Prepare state
-    random = np.random.default_rng(random_seed)
-    df_locations = df_locations[df_locations["commune_id"] == destination_id]
-    
-    # Determine demand
-    df_flow = df_flow[df_flow["destination_id"] == destination_id]
-    count = df_flow["count"].sum()
-
-    # Sample destinations
-    weight = np.ones((len(df_locations),)) / len(df_locations)
-
-    if "weight" in df_locations:
-        weight = df_locations["weight"].values / df_locations["weight"].sum()
-    
-    location_counts = random.multinomial(count, weight)
-    location_ids = df_locations["location_id"].values
-    location_ids = np.repeat(location_ids, location_counts)
-
-    # Shuffle, as otherwise it is likely that *all* copies 
-    # of the first location id go to the first origin, and so on
-    # note that directly shuffling location_ids gives warning in current pandas
-    sorter = np.arange(len(location_ids))
-    random.shuffle(sorter)
-    location_ids = location_ids[sorter]
-
-    # Construct a data set for all commutes to this zone
-    origin_id = np.repeat(df_flow["origin_id"].values, df_flow["count"].values)
-
-    df_result = pd.DataFrame.from_records(dict(
-        origin_id = origin_id,
-        location_id = location_ids
-    ))
-    df_result["destination_id"] = destination_id
-
-    return df_result
-
-def process(context, purpose, random, df_persons, df_od, df_locations,step_name):
-    df_persons = df_persons[df_persons["has_%s_trip" % purpose]]
-
-    # Sample commute flows based on population
-    df_demand = df_persons.groupby("commune_id",observed=False).size().reset_index(name = "count")
-    df_demand["random_seed"] = random.integers(0, int(1e6), len(df_demand))
-    df_demand = df_demand[["commune_id", "count", "random_seed"]]
+    df_demand = df_persons_active.groupby("commune_id", observed=True).size().reset_index(name="count")
     df_demand = df_demand[df_demand["count"] > 0]
 
-    df_flow = []
+    print(f"[{step_name}] Preparing OD dictionary...")
+    od_dict = {}
+    for origin_id, group in df_od.groupby("origin_id", observed=True):
+        weights = group["weight"].values.astype(np.float64)
+        s = np.sum(weights)
+        if s > 0:
+            od_dict[origin_id] = {
+                "dests": group["destination_id"].values,
+                "probs": weights / s
+            }
 
-    with context.progress(label = "Sampling %s municipalities" % step_name, total = len(df_demand)) as progress:
-        with context.parallel(dict(df_od = df_od)) as parallel:
-            for df_partial in parallel.imap_unordered(sample_destination_municipalities, df_demand.itertuples(index = False, name = None)):
-                df_flow.append(df_partial)
+    print(f"[{step_name}] Sampling destination municipalities...")
+    flow_origins = []
+    flow_dests = []
+    
+    missing_od_origins = set()
 
-    df_flow = pd.concat(df_flow).sort_values(["origin_id", "destination_id"])
+    for row in df_demand.itertuples(index=False):
+        orig = row.commune_id
+        cnt = row.count
 
-    # Sample destinations based on the obtained flows
-    unique_ids = df_flow["destination_id"].unique()
-    random_seeds = random.integers(0, int(1e6), len(unique_ids))
+        if orig in od_dict:
+            dests = random.choice(od_dict[orig]["dests"], size=cnt, p=od_dict[orig]["probs"])
+        else:
+            missing_od_origins.add(orig)
+            dests = np.full(cnt, orig)
 
-    df_result = []
+        flow_origins.extend(np.full(cnt, orig))
+        flow_dests.extend(dests)
 
-    with context.progress(label = "Sampling %s destinations" % purpose, total = len(df_demand)) as progress:
-        with context.parallel(dict(df_locations = df_locations, df_flow = df_flow)) as parallel:
-            for df_partial in parallel.imap_unordered(sample_locations, zip(unique_ids, random_seeds)):
-                df_result.append(df_partial)
+    if missing_od_origins:
+        print(f"[{step_name}] WARNING: {len(missing_od_origins)} municipalities have active student residents but NO outbound internal OD flows recorded.")
+        print(f"[{step_name}] INSEE codes concerned: {sorted(list(missing_od_origins))}")
 
-    df_result = pd.concat(df_result).sort_values(["origin_id", "destination_id"])
+    df_flow = pd.DataFrame({
+        "origin_id": flow_origins,
+        "destination_id": flow_dests
+    })
 
-    return df_result[["origin_id", "destination_id", "location_id"]]
+    print(f"[{step_name}] Preparing locations dictionary...")
+    loc_dict = {}
+    for dest_id, group in df_locations.groupby("commune_id", observed=True):
+        if "weight" in group.columns:
+            weights = group["weight"].values.astype(np.float64)
+            s = np.sum(weights)
+            probs = weights / s if s > 0 else np.ones(len(group)) / len(group)
+        else:
+            probs = np.ones(len(group)) / len(group)
+
+        loc_dict[dest_id] = {
+            "loc_ids": group["location_id"].values,
+            "probs": probs
+        }
+    print(f"[{step_name}] Sampling exact locations...")
+    
+    df_flow = df_flow.sort_values("destination_id").reset_index(drop=True)
+    final_locs = np.empty(len(df_flow), dtype=object)
+
+    missing_loc_destinations = set()
+
+    for dest_id, indices in df_flow.groupby("destination_id", observed=True).groups.items():
+        cnt = len(indices)
+        if dest_id in loc_dict:
+            data = loc_dict[dest_id]
+            sampled_locs = random.choice(data["loc_ids"], size=cnt, p=data["probs"])
+        else:
+            missing_loc_destinations.add(dest_id)
+            sampled_locs = np.full(cnt, "UNKNOWN_LOCATION")
+            
+        final_locs[indices] = sampled_locs
+
+    if missing_loc_destinations:
+        print(f"[{step_name}] WARNING: {len(missing_loc_destinations)} municipalities were chosen as destinations but have NO corresponding buildings businesses schools.")
+        print(f"[{step_name}] INSEE codes concerned: {sorted(list(missing_loc_destinations))}")
+
+    df_flow["location_id"] = final_locs
+
+    return df_flow[["origin_id", "destination_id", "location_id"]]
+
 
 def execute(context):
     # Prepare population data
@@ -138,20 +133,21 @@ def execute(context):
 
     df_locations = context.stage("synthesis.locations.work")
     df_locations["weight"] = df_locations["employees"]
-    df_work = process(context, "work", random, df_persons,
-        df_work_od, df_locations, "work"
-    )
+    
+    df_work = process(context, "work", random, df_persons, df_work_od, df_locations, "work")
 
     df_locations = context.stage("synthesis.locations.education")
     if context.config("education_location_source") == 'bpe':
-        df_education = process(context, "education", random, df_persons, df_education_od, df_locations,"education")
-    else :
+        df_education = process(context, "education", random, df_persons, df_education_od, df_locations, "education")
+    else:
         df_education = []
         for prefix, education_type in EDUCATION_MAPPING.items():
             df_education.append(
                 process(context, "education", random,
                     df_persons[df_persons["age_range"]==prefix],
-                    df_education_od[df_education_od["age_range"]==prefix],df_locations[df_locations["education_type"].isin(education_type)],prefix)
+                    df_education_od[df_education_od["age_range"]==prefix],
+                    df_locations[df_locations["education_type"].isin(education_type)],
+                    f"education_{prefix}")
             )
         df_education = pd.concat(df_education)
 

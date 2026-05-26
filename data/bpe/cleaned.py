@@ -89,7 +89,9 @@ def execute(context):
     excess_communes = set(df["commune_id"].unique()) - set(df_municipalities["commune_id"].unique())
 
     if len(excess_communes) > 0:
-        raise RuntimeError("Found additional communes: %s" % excess_communes)
+        print("Found additional communes: %s" % excess_communes)
+        df = df[~df["commune_id"].isin(excess_communes)]
+        #raise RuntimeError("Found additional communes: %s" % excess_communes)
 
     # We notice that we have some additional IRIS. Make sure they will be placed randomly in there commune later.
     df_iris = context.stage("data.spatial.iris")

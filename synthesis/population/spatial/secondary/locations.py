@@ -64,7 +64,7 @@ def prepare_destinations(context):
 
     data = {}
 
-    for activity, group in df_locations.groupby("activity_type"):
+    for activity, group in df_locations.groupby("activity_type", observed=True):
         data[activity] = dict(
             identifiers = group["location_id"].values,
             locations = np.column_stack((group.geometry.x, group.geometry.y))

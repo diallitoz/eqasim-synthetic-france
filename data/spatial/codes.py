@@ -45,6 +45,18 @@ def execute(context):
     if len(requested_departments) > 0:
         df_codes = df_codes[df_codes["departement_id"].isin(requested_departments)]
 
+    
+    # Focus on only French metropolitain without 
+    # Guadeloupe (971), Martinique (972), Guyane (973), La Réunion (974)
+    # Mayotte (976),  Nouvelle-Calédonie (988)
+    # Tous les departements inconnus (0)
+    # Garde la corse Corse-du-Sud (2A), Haute-Corse (2B),
+    all_iris = len(set(df_codes["iris_id"].unique()))
+    no_requested_departments = ["971", "972", "973", "974", "976", "988", "0"]
+    df_codes = df_codes[~df_codes["departement_id"].isin(no_requested_departments)]
+    only_metro_iris = len(set(df_codes["iris_id"].unique()))
+    print("Number no metropolitain IRIS", all_iris - only_metro_iris)
+
     df_codes["iris_id"] = df_codes["iris_id"].cat.remove_unused_categories()
     df_codes["commune_id"] = df_codes["commune_id"].cat.remove_unused_categories()
     df_codes["departement_id"] = df_codes["departement_id"].cat.remove_unused_categories()

@@ -12,21 +12,31 @@ def configure(context):
 
 RENAME = { "COMMUNE" : "origin_id", "DCLT" : "destination_id", "IPONDI" : "weight", "DCETUF" : "destination_id" }
 
+MAPPING_TRANS = {
+    1: "no transport",
+    2: "walk",
+    3: "bike",
+    4: "car",
+    5: "car",
+    6: "pt"
+}
+
+def get_age_range(age):
+    if age <= 6: return "primary_school"
+    if age == 11: return "middle_school"
+    if age == 15: return "high_school"
+    if age >= 18: return "higher_education"
+    return ""
+
 def execute(context):
-    
-    
-    # Load data
     df_work, df_education = context.stage("data.od.raw")
 
-    # Renaming
     df_work = df_work.rename(RENAME, axis = 1)
     df_education = df_education.rename(RENAME, axis = 1)
 
-    # Fix arrondissements
     df_work.loc[~df_work["ARM"].str.contains("Z"), "origin_id"] = df_work["ARM"]
     df_education.loc[~df_education["ARM"].str.contains("Z"), "origin_id"] = df_education["ARM"]
 
-    # Verify spatial data for work
     df_codes = context.stage("data.spatial.codes")
 
     df_work["origin_id"] = df_work["origin_id"].astype("category")
@@ -36,9 +46,6 @@ def execute(context):
     if len(excess_communes) > 0:
         raise RuntimeError("Found additional communes: %s" % excess_communes)
 
-    # Verify spatial data for education
-    df_codes = context.stage("data.spatial.codes")
-
     df_education["origin_id"] = df_education["origin_id"].astype("category")
     df_education["destination_id"] = df_education["destination_id"].astype("category")
 
@@ -46,35 +53,29 @@ def execute(context):
     if len(excess_communes) > 0:
         raise RuntimeError("Found additional communes: %s" % excess_communes)
 
-    # Clean commute mode for work
-    df_work["commute_mode"] = ""
-    df_work.loc[df_work["TRANS"] == 1, "commute_mode"] = "no transport"
-    df_work.loc[df_work["TRANS"] == 2, "commute_mode"] = "walk"
-    df_work.loc[df_work["TRANS"] == 3, "commute_mode"] = "bike"
-    df_work.loc[df_work["TRANS"] == 4, "commute_mode"] = "car"
-    df_work.loc[df_work["TRANS"] == 5, "commute_mode"] = "car"
-    df_work.loc[df_work["TRANS"] == 6, "commute_mode"] = "pt"
+    df_work["commute_mode"] = df_work["TRANS"].map(MAPPING_TRANS).fillna("")
     assert not np.any(df_work["commute_mode"] == "")
     df_work["commute_mode"] = df_work["commute_mode"].astype("category")
     
-    
-
-    # Clean age range for education
     df_education["AGEREV10"] = df_education["AGEREV10"].astype(int)
-    df_education["age_range"] = ""
-    df_education.loc[df_education["AGEREV10"] <= 6, "age_range"] = "primary_school"
-    df_education.loc[df_education["AGEREV10"] == 11, "age_range"] = "middle_school"
-    df_education.loc[df_education["AGEREV10"] == 15, "age_range"] = "high_school"
-    df_education.loc[df_education["AGEREV10"] >= 18, "age_range"] = "higher_education"
+    
+    conds = [
+        df_education["AGEREV10"] <= 6,
+        df_education["AGEREV10"] == 11,
+        df_education["AGEREV10"] == 15,
+        df_education["AGEREV10"] >= 18
+    ]
+    choices = ["primary_school", "middle_school", "high_school", "higher_education"]
+    df_education["age_range"] = np.select(conds, choices, default="")
+    
     assert not np.any(df_education["age_range"] == "")
     df_education["age_range"] = df_education["age_range"].astype("category")
 
-    # Aggregate the flows
     print("Aggregating work ...")
-    df_work = df_work.groupby(["origin_id", "destination_id", "commute_mode"],observed=False)["weight"].sum().reset_index()
+    df_work = df_work.groupby(["origin_id", "destination_id", "commute_mode"], observed=True)["weight"].sum().reset_index()
 
     print("Aggregating education ...")
-    df_education = df_education.groupby(["origin_id", "destination_id","age_range"],observed=False)["weight"].sum().reset_index()
+    df_education = df_education.groupby(["origin_id", "destination_id", "age_range"], observed=True)["weight"].sum().reset_index()
 
     df_work["weight"] = df_work["weight"].fillna(0.0)
     df_education["weight"] = df_education["weight"].fillna(0.0)

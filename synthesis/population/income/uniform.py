@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
 from synthesis.population.income.utils import income_uniform_sample
-import multiprocessing as mp
-from tqdm import tqdm
 
 """
 This stage assigns a household income to each household of the synthesized
@@ -16,31 +14,17 @@ def configure(context):
     context.stage("data.income.municipality")
     context.stage("synthesis.population.sampled")
     context.stage("synthesis.population.spatial.home.zones")
-
     context.config("random_seed")
-
-
-def _sample_income(context, args):
-    commune_id, random_seed = args
-    df_households, df_income = context.data("households"), context.data("income")
-
-    random = np.random.default_rng(random_seed)
-
-    f = df_households["commune_id"] == commune_id
-    df_selected = df_households[f]
-
-    centiles = list(df_income[df_income["commune_id"] == commune_id][["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9"]].iloc[0].values / 12)
-
-    incomes = income_uniform_sample(random, centiles, len(df_selected))
-
-    return f, incomes
 
 def execute(context):
     random = np.random.default_rng(context.config("random_seed"))
 
-    # Load data
     df_income = context.stage("data.income.municipality")
     df_income = df_income[(df_income["attribute"] == "all") & (df_income["value"] == "all")]
+    
+    centile_cols = ["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9"]
+    df_income_clean = df_income[["commune_id"] + centile_cols].copy()
+    df_income_clean[centile_cols] = df_income_clean[centile_cols] / 12.0
 
     df_households = context.stage("synthesis.population.sampled")[[
         "household_id", "consumption_units"
@@ -50,17 +34,29 @@ def execute(context):
         "household_id", "commune_id"
     ]]
 
-    df_households = pd.merge(df_households, df_homes)
+    df_households = pd.merge(df_households, df_homes, on="household_id")
 
-    # Perform sampling per commune
-    with context.parallel(dict(households = df_households, income = df_income)) as parallel:
-        commune_ids = df_households["commune_id"].unique()
-        random_seeds = random.integers(10000, size = len(commune_ids))
+    income_dict = df_income_clean.set_index("commune_id")[centile_cols].to_dict(orient="index")
 
-        for f, incomes in context.progress(parallel.imap(_sample_income, zip(commune_ids, random_seeds)), label = "Imputing income ...", total = len(commune_ids)):
-            df_households.loc[f, "household_income"] = incomes * df_households.loc[f, "consumption_units"]
+    print("Imputing income vectorially...")
+    
+    def sample_group(group):
+        commune_id = group.name
+        n_samples = len(group)
+        
+        if commune_id in income_dict:
+            centiles = list(income_dict[commune_id].values())
+        else:
+            centiles = [0.0] * 9 
+            
+        incomes = income_uniform_sample(random, centiles, n_samples)
+        return pd.Series(incomes, index=group.index)
 
-    # Cleanup
+    household_incomes = df_households.groupby("commune_id", observed=True).apply(sample_group).reset_index(level=0, drop=True)
+    
+    df_households["household_income"] = household_incomes * df_households["consumption_units"]
+
     df_households = df_households[["household_id", "household_income", "consumption_units"]]
     assert len(df_households) == len(df_households["household_id"].unique())
+    
     return df_households

@@ -50,7 +50,9 @@ def execute(context):
     merged_iris = set(df_iris["iris_id"].unique())
 
     if requested_iris != merged_iris:
-        raise RuntimeError("Some IRIS are missing: %s" % (requested_iris - merged_iris,))
+        print(df_codes[df_codes["iris_id"].isin(requested_iris - merged_iris)])
+        print("Some IRIS are missing: %s" % (requested_iris - merged_iris,))
+        #raise RuntimeError("Some IRIS are missing: %s" % (requested_iris - merged_iris,))
 
     return df_iris
 

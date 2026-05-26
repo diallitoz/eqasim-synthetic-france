@@ -1,5 +1,6 @@
 import synthesis.population.spatial.secondary.rda as rda
 import sklearn.neighbors
+import scipy.spatial
 import numpy as np
 
 class CustomDistanceSampler(rda.FeasibleDistanceSampler):
@@ -29,21 +30,21 @@ class CandidateIndex:
         self.data = data
         self.indices = {}
 
-        for purpose, data in self.data.items():
+        for purpose, data_dict in self.data.items():
             print("Constructing spatial index for %s ..." % purpose)
-            self.indices[purpose] = sklearn.neighbors.KDTree(data["locations"])
+            self.indices[purpose] = scipy.spatial.cKDTree(data_dict["locations"])
 
     def query(self, purpose, location):
-        index = self.indices[purpose].query(location.reshape(1, -1), return_distance = False)[0][0]
+        _, index = self.indices[purpose].query(location)
         identifier = self.data[purpose]["identifiers"][index]
-        location = self.data[purpose]["locations"][index]
-        return identifier, location
+        loc = self.data[purpose]["locations"][index]
+        return identifier, loc
 
     def sample(self, purpose, random):
         index = random.integers(0, len(self.data[purpose]["locations"]))
         identifier = self.data[purpose]["identifiers"][index]
-        location = self.data[purpose]["locations"][index]
-        return identifier, location
+        loc = self.data[purpose]["locations"][index]
+        return identifier, loc
 
 class CustomDiscretizationSolver(rda.DiscretizationSolver):
     def __init__(self, index, random, escort_activities, escort_weights):
@@ -61,10 +62,10 @@ class CustomDiscretizationSolver(rda.DiscretizationSolver):
                 loc_purpose = str(self.random.choice(self.escort_activities, p=self.escort_probs))
             else:
                 loc_purpose = purpose
-            identifier, location = self.index.query(loc_purpose, location.reshape(1, -1))
+            identifier, loc = self.index.query(loc_purpose, location)
 
             discretized_identifiers.append(identifier)
-            discretized_locations.append(location)
+            discretized_locations.append(loc)
 
         assert len(discretized_locations) == problem["size"]
 
