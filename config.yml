@@ -24,7 +24,7 @@ config:
 
   # Paths to the input data and where the output should be stored
   data_path:  /work/home/simulations/matsim/data
-  output_path: /work/home/simulations/matsim/national/output_100p/2.emp/1.wkdays
+  output_path: /work/home/simulations/matsim/national/output_100p/2.emp/2.wkd
 
   # Only interesting if you run the simulation
   java_memory: 128G
