@@ -74,12 +74,21 @@ class CustomDiscretizationSolver(rda.DiscretizationSolver):
         )
 
 class CustomFreeChainSolver(rda.RelaxationSolver):
-    def __init__(self, random, index):
+    def __init__(self, random, index, escort_activities, escort_weights):
         self.random = random
         self.index = index
+        self.escort_activities = np.array(escort_activities)
+        self.escort_probs = np.array(escort_weights) / np.sum(escort_weights)
 
     def solve(self, problem, distances):
-        identifier, anchor = self.index.sample(problem["purposes"][0], self.random)
+        purpose = problem["purposes"][0]
+
+        if purpose == "escort":
+            loc_purpose = str(self.random.choice(self.escort_activities, p=self.escort_probs))
+        else:
+            loc_purpose = purpose
+
+        identifier, anchor = self.index.sample(loc_purpose, self.random)
         locations = rda.sample_tail(self.random, anchor, distances)
         locations = np.vstack((anchor, locations))
 

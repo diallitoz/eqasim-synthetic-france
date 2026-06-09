@@ -2,7 +2,7 @@
 ## based on the synpp package
 
 # This is the path to a directory where the pipeline can store temporary data
-working_directory: /work/home/simulations/matsim/cache
+working_directory: /work/home/simulations/matsim/cache_idf
 
 # This section defines which parts of the pipeline should be run
 run:
@@ -16,7 +16,7 @@ config:
   processes: 64
 
   # Define whether to use ENTD or EGT as the household travel survey (HTS)
-  hts: emp
+  hts: egt
 
   # Define sampling rate and random seed for the output population
   sampling_rate: 1
@@ -24,37 +24,36 @@ config:
 
   # Paths to the input data and where the output should be stored
   data_path:  /work/home/simulations/matsim/data
-  output_path: /work/home/simulations/matsim/national/output_100p/2.emp/2.wkd
+  output_path: /work/home/simulations/matsim/idf/output_100p
 
   # Only interesting if you run the simulation
   java_memory: 128G
 
   # Activate if you want to run mode choice
-  mode_choice: false
+  mode_choice: true
 
   # Uncomment to use the bhepop2 package for attributing income
   #income_assignation_method: bhepop2
 
   # IdF settings
-  output_prefix: national_emp_
-  # gpkg format not adapted for 100% french demand
+  output_prefix: idf_100_
   output_formats: ["csv", "parquet", "geoparquet"]
-  regions: []
-  #gtfs_path: gtfs_idf
-  #osm_path: osm_idf
-  #ban_path: ban_idf
-  ban_path: ban_national
-  #bdtopo_path: bdtopo_idf
+  regions: [11]
+  gtfs_path: gtfs_idf
+  osm_path: osm_idf
+  ban_path: ban_idf
+  #ban_path: ban_national
+  bdtopo_path: bdtopo_idf
   #bdtopo_path: bdtopo_dep08_2025
   #bdtopo_path: bdtopo_national
-  bdtopo_path: bdtopo_national_reg
+  #bdtopo_path: bdtopo_national_reg
 
   #iris_path: iris_2023
 
   java_binary: /work/home/install/jdk-25.0.2/bin/java
   osmosis_binary: /work/home/install/osmosis.0.48/osmosis
   maven_binary: /work/home/install/apache-maven-3.8.4/bin/mvn
-  eqasim_path: /work/home/install/ile_de_france-2.1.0.jar
+  eqasim_path: /work/home/install
   #eqasim_tag: None
   eqasim_version: 2.1.0
   pt2matsim_path: /work/home/install/pt2matsim-26.1.1-SNAPSHOT-shaded.jar

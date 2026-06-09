@@ -57,7 +57,7 @@ def execute(context):
     else:
         os.makedirs("%s/eqasim-java/ile_de_france/target" % context.path())
         shutil.copy(
-            "%s/ile_de_france/target/ile_de_france-%s.jar" % (context.config("eqasim_path"), version),
+            "%s/ile_de_france-%s.jar" % (context.config("eqasim_path"), version),
             "%s/eqasim-java/ile_de_france/target/ile_de_france-%s.jar" % (context.path(), version)
         )
 

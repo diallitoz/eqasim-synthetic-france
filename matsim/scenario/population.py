@@ -113,6 +113,13 @@ def execute(context):
     output_path = "%s/population.xml.gz" % context.path()
 
     df_persons = context.stage("synthesis.population.enriched")
+
+    # Avoid float number
+    id_cols = ["census_household_id", "census_person_id", "hts_household_id", "hts_id", "household_id", "age"]
+    for col in id_cols:
+        if col in df_persons.columns:
+            df_persons[col] = pd.to_numeric(df_persons[col], errors='coerce').fillna(-1).astype(np.int64)
+
     df_persons = df_persons.sort_values(by = ["household_id", "person_id"])
 
     person_fields = PERSON_FIELDS
@@ -129,6 +136,8 @@ def execute(context):
 
     df_activities = pd.merge(df_activities, df_locations, how = "left", on = ["person_id", "activity_index"])
     #df_activities["location_id"] = df_activities["location_id"].fillna(-1).astype(int)
+
+    df_activities["location_id"] = df_activities["location_id"].fillna("-1").astype(str)
 
     df_trips = context.stage("synthesis.population.trips")
     df_trips["travel_time"] = df_trips["arrival_time"] - df_trips["departure_time"]

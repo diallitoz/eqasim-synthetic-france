@@ -195,7 +195,12 @@ def process(context, arguments):
       random = random, maximum_iterations = min(1000, maximum_iterations))
 
   tail_solver = AngularTailSolver(random = random)
-  free_solver = CustomFreeChainSolver(random, candidate_index)
+  free_solver = CustomFreeChainSolver(
+      random, 
+      candidate_index,
+      escort_activities=context.config("escort_locations_activities"),
+      escort_weights=context.config("escort_locations_weights")
+  )
 
   relaxation_solver = GeneralRelaxationSolver(chain_solver, tail_solver, free_solver)
 
