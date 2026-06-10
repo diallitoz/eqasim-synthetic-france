@@ -41,19 +41,27 @@ def configure(context):
 def execute(context):
     std_survey = context.stage("data.hts.mobisurvstd.raw")
 
-    df_households = std_survey.households.select(
+    household_cols = [
         "household_id",
         "trips_weekday",
-        household_weight="sample_weight",
-        household_size="nb_persons",
-        number_of_vehicles=pl.col("nb_cars") + pl.col("nb_motorcycles"),
-        number_of_bikes="nb_bicycles",
-        departement_id="home_dep",
-        urban_type=pl.col("home_insee_urban_type")
-        .cast(pl.String)
-        .replace({"outside_urban_unit": "none"})
-        .fill_null("none"),
-    )
+        pl.col("sample_weight").alias("household_weight"),
+        pl.col("nb_persons").alias("household_size"),
+        (pl.col("nb_cars") + pl.col("nb_motorcycles")).alias("number_of_vehicles"),
+        pl.col("nb_bicycles").alias("number_of_bikes"),
+        pl.col("home_dep").alias("departement_id"),
+    ]
+
+    if context.config("use_urban_type"):
+        urban_col = "home_insee_density"  # Unable to find 'home_insee_urban_type'
+        
+        household_cols.append(
+            pl.col(urban_col)
+            .cast(pl.String)
+            .replace({"outside_urban_unit": "none"})
+            .fill_null("none")
+            .alias("urban_type")
+        )
+    df_households = std_survey.households.select(household_cols)
 
     if df_households["trips_weekday"].is_not_null().mean() > 0.95:
         # The weekday at which the trips took place is known (for almost all households).
@@ -200,6 +208,6 @@ def execute(context):
     df_trips = df_trips.join(df_households, on="household_id", how="semi")
 
     # Impute urban type.
-    if not context.config("use_urban_type"):
+    if not context.config("use_urban_type") and "urban_type" in df_households.columns:
         df_households = df_households.drop("urban_type")
     return df_households, df_persons, df_trips
