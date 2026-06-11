@@ -6,23 +6,22 @@ gathering the data for the [synthetic population](../population/population_summa
 ## I) Road network (OpenStreetMap)
 
 The road network in the pipeline is based on OpenStreetMap data.
-A cut-out for Île-de-France is available from Geofabrik:
+A cut-out for Centre-Val de Loire is available from Geofabrik:
 
-- [Île-de-France OSM](https://download.geofabrik.de/europe/france/ile-de-france.html)
-- We recommend to use the fixed snapshot from 01/01/2022: [ile-de-france-220101.osm.pbf](https://download.geofabrik.de/europe/france/ile-de-france-220101.osm.pbf)
-- Download *ile-de-france-220101.osm.pbf* and put it into the folder `data/osm_idf`.
+- [Centre-Val de Loire OSM](https://download.geofabrik.de/europe/france/centre.html)
+- Download *centre-latest.osm.pbf* and put it into the folder `data/osm_centre_val_loire`.
 
 ## II) Public transit schedule (GTFS)
 
-A digital public transport schedule for Île-de-France is available from Île-de-France mobilités. Since 2023 you are required to create an account and accept the data license before making use of the data.
+- **Réseau urbain et périurbain Fil Bleu**
+    - Go to [Transport Data Gouv](https://transport.data.gouv.fr/datasets/fil-bleu-syndicat-des-mobilites-gtfs-gtfs-rt)
+    - Under *Données statiques*, click on **Télécharger**.
+    - Put the downloaded file into the folder `data/gtfs_tours` and rename it to `fil_bleu.zip`.
 
-- Go to [Île-de-France GTFS](https://prim.iledefrance-mobilites.fr/fr/donnees-statiques/offre-horaires-tc-gtfs-idfm)
-- Create an account "Connexion" on top of the page
-- Once you have created a valid account, go back to the page and click "Exporter la donnée"
-- In the popup window, accept the use conditions and select "CSV" type, then click "Télécharger" to download
-- The resulting file is not the data itself, but only contains a link to them. Open the downloaded CSV and find the URL starting with `https://data.iledefrance-mobilites.fr/api/v2/catalog/datasets/...`
-- Enter the URL in your browser and download the file `IDFM-gtfs.zip`
-- Put `IDFM-gtfs.zip` into the folder `data/gtfs_idf`
+- **Réseau interurbain Rémi** 
+    - Go to [Transport Data Gouv](https://transport.data.gouv.fr/datasets/remi-offre-theorique-mobilite-reseau-interurbain-regional)
+    - Under *Données statiques* > *REMI GTFS*, click on **Télécharger**.
+    - Put the downloaded file into the folder `data/gtfs_tours` and rename it to `remi.zip`.
 
 Note that this schedule is updated regularly and is only valid for the next three
 weeks.
@@ -31,5 +30,6 @@ weeks.
 
 In your directory structure, there should now be the following additional files:
 
-- `data/osm_idf/ile-de-france-latest.osm.pbf`
-- `data/gtfs_idf/IDFM-gtfs.zip`
+- `data/osm_centre_val_loire/centre-260608.osm.pbf`
+- `data/gtfs_tours/fil_bleu.zip`
+- `data/gtfs_tours/REMI.zip`

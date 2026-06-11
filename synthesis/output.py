@@ -142,7 +142,7 @@ def execute(context):
     else:
         print("[2/6] Skipping activities (already exists)")
         
-    del df_person_mapping
+    #del df_person_mapping
     gc.collect()
 
     if miss_hh:
@@ -248,6 +248,7 @@ def execute(context):
     if miss_sp_act or miss_sp_homes or miss_sp_commutes or miss_sp_trips:
         print("[6/6] Processing spatial geometries (High RAM Zone)...")
         df_locations = context.stage("synthesis.population.spatial.locations")
+        df_locations = pd.merge(df_locations, df_person_mapping, on="person_id", how="left")
         crs_val = df_locations.crs if hasattr(df_locations, "crs") else "EPSG:2154"
         
         cols_to_string = ["location_id", "purpose", "departement_id", "commune_id", "iris_id"]
@@ -272,6 +273,8 @@ def execute(context):
             purpose_col = "purpose" if "purpose" in df_locations else "activity_index"
             val_to_match = "home" if purpose_col == "purpose" else 0
             
+            df_homes = df_locations[df_locations[purpose_col] == val_to_match].drop_duplicates("household_id")
+            df_homes = df_homes[["household_id","iris_id", "commune_id","departement_id","region_id", "geometry"]]
             df_homes = df_locations[df_locations[purpose_col] == val_to_match].drop_duplicates("household_id")
             df_homes = df_homes[["household_id","iris_id", "commune_id","departement_id","region_id", "geometry"]]
             df_homes = gpd.GeoDataFrame(df_homes, crs=crs_val)

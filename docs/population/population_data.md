@@ -52,46 +52,37 @@ The census of services and facilities in France is available from INSEE:
 - Download the data set in **parquet** format.
 - Copy the *parquet* file into the folder `data/bpe_2024`.
 
-## 6a) National household travel survey (ENTD 2008)
+### 6) Departmental household travel survey (EMC2 d’Indre-et-Loire)
 
-The national household travel survey is available from the Ministry of Ecology:
+Usually, you do not have access to this household travel survey, which is not available publicly. 
 
-- [National household travel survey](https://www.statistiques.developpement-durable.gouv.fr/enquete-nationale-transports-et-deplacements-entd-2008)
-- Scroll all the way down the website to the **Table des donnés** (a clickable
-pop-down menu).
-- You can either download all the available *csv* files in the list, but only
-a few are actually relevant for the pipeline. Those are:
-  - Données socio-démographiques des ménages (Q_tcm_menage_0.csv)
-  - Données socio-démographiques des individus (Q_tcm_individu.csv)
-  - Logement, stationnement, véhicules à disposition des ménages (Q_menage.csv)
-  - Données trajets domicile-travail, domicile-étude, accidents (Q_individu.csv)
-  - Données mobilité contrainte, trajets vers lieu de travail (Q_ind_lieu_teg.csv)
-  - Données mobilité déplacements locaux (K_deploc.csv)
-- Put the downloaded *csv* files in to the folder `data/entd_2008`.
+[Download link (for researchers)](https://data.progedo.fr/series/adisp/enquetes-menages-deplacements-emd-enquetes-mobilite-certifiee-cerema-emc)
 
-### 6b) *(Optional)* National Person Mobility Survey (EMP 2019)
-
-The National Person Mobility Survey is also available from the Ministry of Ecology:
-
-- [National Person Mobility Survey](https://www.statistiques.developpement-durable.gouv.fr/resultats-detailles-de-lenquete-mobilite-des-personnes-de-2019)
-- Scroll all the way down the website to the **Télécharger les données individuelles anonymisées et leurs dictionnaires** (a clickable pop-down menu).
-- Download the data set in **csv** by clicking on the link **Données individuelles anonymisées (fichiers au format CSV) - EMP 2019**
-- Copy the *zip* file into the folder `data/emp_2019`.
-
-### 6c) *(Optional)* Regional household travel survey (EGT)
-
-Usually, you do not have access to the regional household travel
-survey, which is not available publicly. In case you have access (but we cannot
-guarantee that you have exactly the correct format), you should make sure that
-the following files are accessible in the folder `data/egt_2010`:
-`Menages_semaine.csv`, `Personnes_semaine.csv`, `Deplacements_semaine.csv`.
+Expected format (recent Progedo exports):
+`data/emc2_tours/progedo`/
+├── *-Donnees_CSV  # Subdirectory names do not matter.
+│   └── fichiers_standards
+│       ├── *_std_depl.csv
+│       ├── *_std_men.csv
+│       ├── *_std_pers.csv
+│       └── *_std_traj.csv
+└── *-Documentation  # Subdirectory names do not matter.
+    └── SIG
+        ├── *_ZF(_*)?.(TAB|shp)           # Optional "Zones fines" file
+        ├── *_GT(_*)?.(TAB|shp)           # Optional "Générateurs de trafic" file
+        ├── *_GT_externes(_*)?.(TAB|shp)  # Optional "Générateurs de trafic" external file
+        └── *_DTIR(_*)?.(TAB|shp)         # Optional "Zones de tirage" file
 
 ## 7) IRIS zoning system (2024)
 
 The IRIS zoning system is available from IGN:
 
-- [IRIS data](https://geoservices.ign.fr/contoursiris)
-- Download the **2024** edition.
+- [IRIS data](https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_CONTOURS-IRIS?redirected_from=geoservices.ign.fr)
+- To download the data, follow these steps:
+    1. Scroll down to the **Téléchargements et flux (6)** section.
+    2. Click on **Contours...Iris**.
+    3. In the **Téléchargement de données** field that appears, select the desired format: **GPKG**.
+    4. Click on the year **2024** to access the *.7z* file.
 - Copy the *7z* file into the folder `data/iris_2024`
 
 
@@ -131,26 +122,24 @@ The geolocated enterprise census is available on data.gouv.fr:
 
 The French Buildings database is available from IGN:
 
-- [Buildings database](https://geoservices.ign.fr/bdtopo)
-- In the sidebar on the right, under *Téléchargement anciennes éditions*, click on *BD TOPO® 2024 GeoPackage Départements* to go to the saved data publications from 2024.
-- The data is split by department and they are identified with a number. For the Île-de-France region, download:
-  - Paris (75)
-  - Seine-et-Marne (77)
-  - Yvelines (78)
-  - Essonne (91)
-  - Hauts-de-Seine (92)
-  - Seine-Saint-Denis (93)
-  - Val-de-Marne (94)
-  - Val-d'Oise (95)
-- Copy the eight *7z* files into `data/bdtopo_idf`.
+- [Buildings database](https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_BD-TOPO?redirected_from=geoservices.ign.fr)
+- To download the data for Indre-et-Loire (D037), follow these steps:
+    1. Scroll down to the **Téléchargements et flux (152)** section.
+    2. Click on the arrow in the **BD TOPO® V3** field.
+    3. In the **Téléchargement de données** field that appears, configure the settings as follows:
+        - **ZONE**: Select `D037 - Indre-et-Loire`.
+        - **Format**: Select `GPKG`.
+        - **CRS**: Select `RGF93 v1 / Lambert-93`.
+    4. Download the resulting file.
+- Copy the file into the folder `data/bdtopo_tours`.
 
 ## 11) Adresses database (BAN)
 
 The French adresses database is available on data.gouv.fr :
 
 - [Adresses database](https://adresse.data.gouv.fr/data/ban/adresses/latest/csv/)
-- Click on the link *adresses-xx.csv.gz* where xx = departments codes (75, 77, 78, 91, 92, 93, 94, 95) 
-- Copy the *gz* files into `data/ban_idf`.
+- Click on the link *adresses-37.csv.gz*
+- Copy the *gz* files into `data/ban_tours`.
 
 
 ## Overview
@@ -164,38 +153,14 @@ Your folder structure should now have at least the following files:
 - `data/filosofi_2021/indic-struct-distrib-revenu-2021-COMMUNES_XLSX.zip`
 - `data/filosofi_2021/indic-struct-distrib-revenu-2021-SUPRA_XLSX.zip`
 - `data/bpe_2024/BPE24.parquet`
-- `data/entd_2008/Q_individu.csv`
-- `data/entd_2008/Q_tcm_individu.csv`
-- `data/entd_2008/Q_menage.csv`
-- `data/entd_2008/Q_tcm_menage_0.csv`
-- `data/entd_2008/K_deploc.csv`
-- `data/entd_2008/Q_ind_lieu_teg.csv`
-- `data/iris_2024/CONTOURS-IRIS_3-0__GPKG_LAMB93_FXX_2024-01-01.7z`
+- `data/emc2_tours/progedo/Csv/Fichiers_Standard/tours_2019_std_depl.csv`
+- `data/emc2_tours/progedo/Csv/Fichiers_Standard/tours_2019_std_men.csv`
+- `data/emc2_tours/progedo/Csv/Fichiers_Standard/tours_2019_std_pers.csv`
+- `data/emc2_tours/progedo/Csv/Fichiers_Standard/tours_2019_std_traj.csv`
+- `data/iris_2024/CONTOURS-IRIS_..._GPKG.7z`
 - `data/codes_2024/reference_IRIS_geo2024.zip`
-- `data/sirene/StockEtablissement_utf8.csv`
-- `data/sirene/StockUniteLegale_utf8.zip`
-- `data/sirene/GeolocalisationEtablissement_Sirene_pour_etudes_statistiques_utf8.zip`
-- `data/bdtopo_idf/BDTOPO_3-0_TOUSTHEMES_GPKG_LAMB93_D075_2024-03-15.7z`
-- `data/bdtopo_idf/BDTOPO_3-0_TOUSTHEMES_GPKG_LAMB93_D077_2024-03-15.7z`
-- `data/bdtopo_idf/BDTOPO_3-0_TOUSTHEMES_GPKG_LAMB93_D078_2024-03-15.7z`
-- `data/bdtopo_idf/BDTOPO_3-0_TOUSTHEMES_GPKG_LAMB93_D091_2024-03-15.7z`
-- `data/bdtopo_idf/BDTOPO_3-0_TOUSTHEMES_GPKG_LAMB93_D092_2024-03-15.7z`
-- `data/bdtopo_idf/BDTOPO_3-0_TOUSTHEMES_GPKG_LAMB93_D093_2024-03-15.7z`
-- `data/bdtopo_idf/BDTOPO_3-0_TOUSTHEMES_GPKG_LAMB93_D094_2024-03-15.7z`
-- `data/bdtopo_idf/BDTOPO_3-0_TOUSTHEMES_GPKG_LAMB93_D095_2024-03-15.7z`
-- `data/ban_idf/adresses-75.csv.gz`
-- `data/ban_idf/adresses-77.csv.gz`
-- `data/ban_idf/adresses-78.csv.gz`
-- `data/ban_idf/adresses-91.csv.gz`
-- `data/ban_idf/adresses-92.csv.gz`
-- `data/ban_idf/adresses-93.csv.gz`
-- `data/ban_idf/adresses-94.csv.gz`
-
-In case you are using the National Person Mobility Survey (EMP) or the Regional household travel survey (EGT), the following files should also be respectively in place:
-- `data/emp_2019/emp_2019_donnees_individuelles_anonymisees_novembre2024.zip`
-
-or
-
-- `data/egt_2010/Menages_semaine.csv`
-- `data/egt_2010/Personnes_semaine.csv`
-- `data/egt_2010/Deplacements_semaine.csv`
+- `data/sirene/StockEtablissement_utf8.parquet`
+- `data/sirene/StockUniteLegale_utf8.parquet`
+- `data/sirene/GeolocalisationEtablissement_Sirene_pour_etudes_statistiques.parquet`
+- `data/bdtopo_tours/BDTOPO_..._GPKG_D037_...7z`
+- `data/ban_tours/adresses-37.csv.gz`

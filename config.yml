@@ -2,12 +2,12 @@
 ## based on the synpp package
 
 # This is the path to a directory where the pipeline can store temporary data
-working_directory: /work/home/simulations/matsim/cache_idf
+working_directory: /work/home/simulations/matsim/cache_tours
 
 # This section defines which parts of the pipeline should be run
 run:
   - synthesis.output # To create the output population in the output_path (see below)
-  #- matsim.output # Uncomment, if you want to run the full simulation (you'll need Java for that)
+  - matsim.output # Uncomment, if you want to run the full simulation (you'll need Java for that)
   #- matsim.scenario.supply.gtfs
 
 # Here the configuraiton of the pipeline starts
@@ -16,7 +16,8 @@ config:
   processes: 64
 
   # Define whether to use ENTD or EGT as the household travel survey (HTS)
-  hts: egt
+  hts: mobisurvstd
+  mobisurvstd.path: /work/home/simulations/matsim/data/emc2_tours/1. progedo
 
   # Define sampling rate and random seed for the output population
   sampling_rate: 1
@@ -24,7 +25,7 @@ config:
 
   # Paths to the input data and where the output should be stored
   data_path:  /work/home/simulations/matsim/data
-  output_path: /work/home/simulations/matsim/idf/output_100p
+  output_path: /work/home/simulations/matsim/tours/output_100p
 
   # Only interesting if you run the simulation
   java_memory: 128G
@@ -36,14 +37,15 @@ config:
   #income_assignation_method: bhepop2
 
   # IdF settings
-  output_prefix: idf_100_
+  output_prefix: tours_100_
   output_formats: ["csv", "parquet", "geoparquet"]
-  regions: [11]
-  gtfs_path: gtfs_idf
-  osm_path: osm_idf
-  ban_path: ban_idf
+  regions: [24]
+  departments: ["37"]
+  gtfs_path: gtfs_tours
+  osm_path: osm_centre_val_loire
+  ban_path: ban_tours
   #ban_path: ban_national
-  bdtopo_path: bdtopo_idf
+  bdtopo_path: bdtopo_tours
   #bdtopo_path: bdtopo_dep08_2025
   #bdtopo_path: bdtopo_national
   #bdtopo_path: bdtopo_national_reg
