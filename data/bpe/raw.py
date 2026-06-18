@@ -16,6 +16,8 @@ def execute(context):
 
     df_codes = context.stage("data.spatial.codes")
     requested_departements = df_codes["departement_id"].unique()
+    requested_iris = df_codes["iris_id"].unique()
+    requested_communes = df_codes["commune_id"].dropna().unique().tolist()
 
     with context.progress(label = "Reading BPE ...") as progress:
         parquet = pl.read_parquet("{}/{}".format(context.config("data_path"), context.config("bpe_path")), columns = [ "CAPACITE",
@@ -25,7 +27,7 @@ def execute(context):
                 )
 
         parquet = parquet.cast( dict(DEPCOM = str, DEP = str, DCIRIS = str))
-        parquet = parquet.filter(pl.col("DEP").is_in(requested_departements))
+        parquet = parquet.filter(pl.col("DCIRIS").is_in(requested_iris)| pl.col("DEPCOM").is_in(requested_communes))# Use of IRIS for better spatial filtering
 
         progress.update(len(parquet))
 

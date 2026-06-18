@@ -52,9 +52,9 @@ def execute(context):
     df_households = pd.DataFrame(df_tcm_menage, copy = True).rename(columns={ "ident_men":"IDENT_MEN"})
     df_trips = pd.DataFrame(df_deploc, copy = True)
 
-    # Keep only households / persons that were surveyed during weekend.
+    # Keep only households / persons that were surveyed during weekdays.
     valid_households = df_individu.loc[
-        df_individu["MDATE_jour"].isin(("samedi", "dimanche")), "IDENT_MEN"
+        ~df_individu["MDATE_jour"].isin(("samedi", "dimanche")), "IDENT_MEN"
     ]
     df_persons = df_persons.loc[df_persons["IDENT_MEN"].isin(valid_households)].copy()
     df_households = df_households.loc[df_households["IDENT_MEN"].isin(valid_households)].copy()

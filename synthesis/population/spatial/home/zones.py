@@ -28,15 +28,35 @@ def execute(context):
         "household_id", "commune_id", "iris_id", "departement_id"
     ]].copy().set_index("household_id")
 
-    f_has_commune = df_households["commune_id"] != "undefined"
-    f_has_iris = df_households["iris_id"] != "undefined"
-
-    # Fix missing communes (we select from those without IRIS)
     df_municipalities = context.stage("data.spatial.municipalities").set_index("commune_id")
     df_municipalities["population"] = context.stage("data.spatial.population").groupby("commune_id")["population"].sum()
 
     df_households["commune_id"] = df_households["commune_id"].cat.add_categories(
         sorted(set(df_municipalities.index.unique()) - set(df_households["commune_id"].cat.categories)))
+
+    valid_communes = set(df_municipalities.index.unique())
+    valid_communes.add("undefined")
+
+    f_invalid = ~df_households["commune_id"].isin(valid_communes)
+
+    if f_invalid.any():
+        df_target = df_households[f_invalid].copy()
+        
+        weights = df_municipalities["population"].values.astype(float)
+        if (weights == 0.0).all(): weights += 1.0
+        weights /= np.sum(weights)
+
+        indices = np.repeat(np.arange(weights.shape[0]), random.multinomial(len(df_target), weights))
+        df_households.loc[f_invalid, "commune_id"] = df_municipalities.index[indices].values
+        
+        df_households.loc[f_invalid, "iris_id"] = "undefined"
+
+    #df_households = df_households[df_households["commune_id"].isin(valid_communes)].copy()
+
+    f_has_commune = df_households["commune_id"] != "undefined"
+    f_has_iris = df_households["iris_id"] != "undefined"
+
+    # Fix missing communes (we select from those without IRIS)
 
     departements = df_households[~f_has_commune]["departement_id"].unique()
 
@@ -71,6 +91,12 @@ def execute(context):
             (df_iris["population"] <= 200) &
             (df_iris["commune_id"].astype(str) == commune_id)]
 
+        if len(df_candidates) == 0:
+            df_candidates = df_iris[df_iris["commune_id"].astype(str) == commune_id]
+        
+        if len(df_candidates) == 0:
+            continue
+
         df_target = df_households[
             f_has_commune & ~f_has_iris &
             (df_households["commune_id"] == commune_id)].copy()
@@ -95,7 +121,9 @@ def execute(context):
     # Finally, make sure that we have no invalid codes
     invalid_communes = set(df_households["commune_id"].unique()) - set(df_municipalities.index.unique())
     invalid_iris = set(df_households["iris_id"].unique()) - set(df_iris.index.unique())
-
+    
+    print("invalid_communes", invalid_communes)
+    print("invalid_iris", invalid_iris)
     assert len(invalid_communes) == 0
     assert len(invalid_iris) == 0
     assert np.count_nonzero(df_households["iris_id"] == "undefined") == 0

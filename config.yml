@@ -16,7 +16,10 @@ config:
   processes: 64
 
   # Define whether to use ENTD or EGT as the household travel survey (HTS)
-  hts: emp
+  hts: mobisurvstd
+  mobisurvstd.path: /work/home/simulations/matsim/data/emc2/2020 - Marseille/lil-1556.csv
+  hts_shp_name: EMC2_MAMP_2020_DTIR.shp
+  filter_hts: False # Quit trips performed outside the HTS area
 
   # Define sampling rate and random seed for the output population
   sampling_rate: 1
@@ -24,7 +27,7 @@ config:
 
   # Paths to the input data and where the output should be stored
   data_path:  /work/home/simulations/matsim/data
-  output_path: /work/home/simulations/matsim/national/output_100p/2.emp/2.wkd
+  output_path: /work/home/simulations/matsim/national/output_100p/2020_marseille
 
   # Only interesting if you run the simulation
   java_memory: 128G
@@ -36,7 +39,7 @@ config:
   #income_assignation_method: bhepop2
 
   # IdF settings
-  output_prefix: national_emp_
+  output_prefix: marseille_
   # gpkg format not adapted for 100% french demand
   output_formats: ["csv", "parquet", "geoparquet"]
   regions: []
@@ -47,7 +50,7 @@ config:
   #bdtopo_path: bdtopo_idf
   #bdtopo_path: bdtopo_dep08_2025
   #bdtopo_path: bdtopo_national
-  bdtopo_path: bdtopo_national_reg
+  bdtopo_path: bdtopo_national_reg/93
 
   #iris_path: iris_2023
 

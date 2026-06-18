@@ -39,13 +39,17 @@ def execute(context):
     df_codes = context.stage("data.spatial.codes")
 
     requested_departements = df_codes["departement_id"].unique()
+    requested_iris = df_codes["iris_id"].unique()
+    requested_cantvilles = df_codes["CANTVILLE"].dropna().unique().tolist()
 
     with context.progress(label = "Reading census ...") as progress:
         parquet = pl.read_parquet( "{}/{}".format(context.config("data_path"), context.config("census_path")),
                         columns=  COLUMNS_DTYPES.keys())
 
         parquet = parquet.cast(pl.String)
-        parquet = parquet.filter(pl.col("DEPT").is_in(requested_departements))
+        parquet = parquet.filter(
+            pl.col("IRIS").is_in(requested_iris) | pl.col("CANTVILLE").is_in(requested_cantvilles)
+        )# Use of IRIS or CANTVILLE for better spatial filtering
 
         progress.update(len(parquet))
 
