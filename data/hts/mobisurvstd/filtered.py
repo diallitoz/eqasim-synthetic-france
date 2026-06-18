@@ -11,9 +11,11 @@ def configure(context):
     context.stage("data.hts.mobisurvstd.cleaned")
     context.stage("data.spatial.codes")
     context.config("filter_hts", True)
+    context.config("output_path")
 
 
 def execute(context):
+    output_path = context.config("output_path")
     df_households, df_persons, df_trips = context.stage("data.hts.mobisurvstd.cleaned")
 
     # Keep only persons which where surveyed for trips (even if they did not traveled).
@@ -102,5 +104,14 @@ def execute(context):
     df_trips_pd = df_trips.to_pandas()
 
     hts.check(df_households_pd, df_persons_pd, df_trips_pd)
+
+    df_households_pd.to_csv(f"{output_path}/households.csv", sep=";", index=None, lineterminator="\n")
+    df_households_pd.to_parquet(f"{output_path}/hts_households.parquet")
+
+    df_persons_pd.to_csv(f"{output_path}/hts_persons.csv", sep=";", index=None, lineterminator="\n")
+    df_persons_pd.to_parquet(f"{output_path}/hts_persons.parquet")
+
+    df_trips_pd.to_csv(f"{output_path}/hts_trips.csv", sep=";", index=None, lineterminator="\n")
+    df_trips_pd.to_parquet(f"{output_path}/hts_trips.parquet")
 
     return df_households_pd, df_persons_pd, df_trips_pd
