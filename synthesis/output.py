@@ -254,7 +254,7 @@ def execute(context):
         for col in cols_to_string:
             if col in df_locations.columns:
                 df_locations[col] = df_locations[col].astype(str)
-
+        print(df_locations)
         if miss_sp_act:
             print("      Exporting spatial activities...")
             df_act_sp = pd.read_parquet(f"{output_path}/temp_activities.parquet")
@@ -267,6 +267,7 @@ def execute(context):
             del df_act_sp
             gc.collect()
 
+        """
         if miss_sp_homes:
             print("      Exporting spatial homes...")
             purpose_col = "purpose" if "purpose" in df_locations else "activity_index"
@@ -278,7 +279,7 @@ def execute(context):
             write_data(df_homes, base_homes, miss_sp_homes)
             del df_homes
             gc.collect()
-
+        """
         if miss_sp_commutes:
             print("      Exporting spatial commutes...")
             purpose_col = "purpose" if "purpose" in df_locations else "activity_index"

@@ -10,16 +10,23 @@ This stage filters out observations which live or travel outside of the study ar
 def configure(context):
     context.stage("data.hts.mobisurvstd.cleaned")
     context.stage("data.spatial.codes")
-    context.config("filter_hts", True)
+    context.config("filter_hts", False)
     context.config("output_path")
 
 
 def execute(context):
     output_path = context.config("output_path")
     df_households, df_persons, df_trips = context.stage("data.hts.mobisurvstd.cleaned")
-
+    len_pers = len(df_persons)
     # Keep only persons which where surveyed for trips (even if they did not traveled).
     df_persons = df_persons.filter("is_surveyed")
+
+    print(
+            (
+                "Warning. Dropping {:,} / {:,} persons "
+                "(No surveyed)"
+            ).format(len_pers - len(df_persons), len_pers)
+        )
 
     remove_ids = set()
 
@@ -28,19 +35,45 @@ def execute(context):
     # area and represent only a very small share of the trips.
     remove_ids |= set(df_trips.filter(pl.col("euclidean_distance").is_null())["person_id"])
 
+    remov_pers = len(remove_ids)
+
+    print(
+            (
+                "Warning. Dropping {:,} / {:,} persons "
+                "(Trips with no distance)"
+            ).format(remov_pers, len(df_persons))
+        )
     # Remove persons for which at least 1 trip has NULL departure or arrival time.
     remove_ids |= set(
         df_trips.filter(pl.col("departure_time").is_null() | pl.col("arrival_time").is_null())[
             "person_id"
         ]
     )
+    remov_pers = len(remove_ids)
 
+    print(
+            (
+                "Warning. Dropping {:,} / {:,} persons "
+                "(Trips with no valid time)"
+            ).format(len(remove_ids) - remov_pers, len(df_persons))
+        )
+
+    remov_pers = len(remove_ids)
     # Remove persons for which at least 1 trip has NULL origin or destination purpose.
     remove_ids |= set(
         df_trips.filter(
             pl.col("preceding_purpose").is_null() | pl.col("following_purpose").is_null()
         )["person_id"]
     )
+
+    print(
+            (
+                "Warning. Dropping {:,} / {:,} persons "
+                "(Trips with no valid purpose)"
+            ).format(len(remove_ids) - remov_pers, len(df_persons))
+        )
+
+    remov_pers = len(remove_ids)
 
     # Remove persons for which at least 1 trip has different origin purpose than destination purpose
     # of the previous trip.
@@ -49,6 +82,15 @@ def execute(context):
             pl.col("preceding_purpose").ne(pl.col("following_purpose").shift(1).over("person_id"))
         )["person_id"]
     )
+
+    print(
+            (
+                "Warning. Dropping {:,} / {:,} persons "
+                "(Trip has different origin purpose than destination purpose of the previous trip)"
+            ).format(len(remove_ids) - remov_pers, len(df_persons))
+        )
+
+    remov_pers = len(remove_ids)
 
     if context.config("filter_hts"):
         df_codes = context.stage("data.spatial.codes")
@@ -59,6 +101,15 @@ def execute(context):
                 pl.col("departement_id").is_in(requested_departments, nulls_equal=True).not_()
             )["person_id"]
         )
+
+        print(
+            (
+                "Warning. Dropping {:,} / {:,} persons "
+                "(Non-residents trips)"
+            ).format(len(remove_ids) - remov_pers, len(df_persons))
+            )
+
+        remov_pers = len(remove_ids)
 
         # Filter trips outside the area.
         if (
@@ -75,6 +126,16 @@ def execute(context):
                     .not_()
                 )["person_id"]
             )
+            print(
+            (
+                "Warning. Dropping {:,} / {:,} persons "
+                "(Trips outside the area)"
+            ).format(len(remove_ids) - remov_pers, len(df_persons))
+            )
+
+            remov_pers = len(remove_ids)
+
+
         else:
             # For EMP 2019, the origin / destination départements are unknown so we do not apply the
             # filter otherwise all trips would be removed.
