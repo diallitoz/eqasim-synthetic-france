@@ -61,7 +61,7 @@ def statistical_matching(progress, df_source, source_identifier, weight, df_targ
     unique_values = {}
 
     for column in columns:
-        unique_values[column] = list(sorted(set(df_source[column].unique()) | set(df_target[column].unique())))
+        unique_values[column] = list(sorted(set(df_source[column].unique()) | set(df_target[column].unique()), key=str))
 
     # Generate filters for all columns and values
     source_filters, target_filters = {}, {}
@@ -178,7 +178,7 @@ def execute(context):
     df_target = context.stage("synthesis.population.sampled")
 
     # Do not match persons whose age is below "matching_minimum_age".
-    df_target = df_target[df_target["age"] >= context.config("matching_minimum_age")]
+    df_target = df_target[df_target["age"] >= context.config("matching_minimum_age")].copy()
 
     columns = context.config("matching_attributes")
 
