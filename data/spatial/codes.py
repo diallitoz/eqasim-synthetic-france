@@ -3,6 +3,7 @@ import geopandas as gpd
 import zipfile
 import py7zr
 from pathlib import Path
+import numpy as np
 
 """
 This stage loads a file containing all spatial codes in France and how
@@ -184,7 +185,13 @@ def execute(context) -> pd.DataFrame:
             df_codes[col] = df_codes[col].cat.remove_unused_categories()
         else:
             df_codes[col] = df_codes[col].astype("category")
-
+    
+    # Clean nan departement
+    nan_dep = df_codes["departement_id"].isna()
+    if np.count_nonzero(nan_dep) > 0:
+        print("Some departements are unknow for these communes:", df_codes[nan_dep]["commune_id"].unique())
+        df_codes = df_codes[~df_codes["departement_id"].isna()]
+    
     return df_codes
 
 

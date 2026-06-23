@@ -47,6 +47,7 @@ def execute(context):
     
     # Check that we cover all requested departments at least once
     for department_id in requested_departments:
+        print(department_id) 
         assert np.count_nonzero(df_ban["department_id"] == department_id) > 0
 
     return df_ban[["geometry"]]

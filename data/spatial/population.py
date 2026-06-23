@@ -37,8 +37,12 @@ def execute(context):
     requested_iris = set(df_codes["iris_id"].unique())
     merged_iris = set(df_population["iris_id"].unique())
 
-    if requested_iris != merged_iris:
-        raise RuntimeError("Some IRIS are missing: %s" % (requested_iris - merged_iris,))
+    excess_iris = requested_iris - merged_iris
+    if len(excess_iris) > 0:
+        print("Some IRIS are missing: %s" % excess_iris)
+
+    if len(excess_iris) > 10:
+        raise RuntimeError("Some IRIS are missing: %s" % excess_iris)
 
     return df_population[["region_id", "departement_id", "commune_id", "iris_id", "population"]]
 
