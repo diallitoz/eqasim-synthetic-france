@@ -18,7 +18,7 @@ def configure(context):
     context.config("codes_path", "codes_2024/reference_IRIS_geo2024.zip")
     context.config("codes_xlsx", "reference_IRIS_geo2024.xlsx")
     context.config("iris_path", "iris_2024")
-    context.config("hts_shp_name", "")
+    context.config("hts_sig_name", "")
     context.config("mobisurvstd.path", "")
 
 
@@ -108,7 +108,7 @@ def execute(context) -> pd.DataFrame:
 
     # 3. Load HTS area and perform Spatial Join
     hts_area_shp_path = data_path / context.config("mobisurvstd.path")
-    requested_hts_file = hts_area_shp_path / "Doc" / "SIG" / context.config("hts_shp_name")
+    requested_hts_file = hts_area_shp_path / "Doc" / "SIG" / context.config("hts_sig_name")
     
     df_requested_hts_area = gpd.read_file(requested_hts_file)
 
