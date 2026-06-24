@@ -111,7 +111,14 @@ def execute(context) -> pd.DataFrame:
     requested_hts_file = hts_area_shp_path / "Doc" / "SIG" / context.config("hts_shp_name")
     
     df_requested_hts_area = gpd.read_file(requested_hts_file)
-    print(df_requested_hts_area)
+
+    if df_requested_hts_area.crs is None:
+        print("SHP CRS unknow")
+        df_requested_hts_area = df_requested_hts_area.set_crs("EPSG:2154")
+
+    elif df_requested_hts_area.crs != "EPSG:2154":
+        print("SHP CRS != 2154")
+        df_requested_hts_area = df_requested_hts_area.to_crs("EPSG:2154")
 
     df_iris_intersecting = df_iris.sjoin(
         df_requested_hts_area[["geometry"]], 
@@ -129,8 +136,6 @@ def execute(context) -> pd.DataFrame:
 
     # 4. Merge codes and geometry
     df_codes = pd.merge(df_codes, df_iris[["iris_id", "commune_id"]], how="right", on=["iris_id", "commune_id"])
-
-    
     mapping_path = Path(context.config("data_path")) / "rp_2022/table-appartenance-geo-communes-22.zip"
     
     # On lit le fichier Excel en ciblant la feuille "COM" et la bonne ligne d'en-tête
