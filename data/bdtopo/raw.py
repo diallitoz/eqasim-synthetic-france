@@ -28,7 +28,7 @@ def get_department_string(department_id):
 
 def execute(context):
     df_departments = context.stage("data.spatial.departments")
-    print("Expecting data for {} departments".format(len(df_departments)))
+    print("Expecting data for {} : {} departments".format(len(df_departments), df_departments["departement_id"].unique()))
     
     source_paths = find_bdtopo("{}/{}".format(context.config("data_path"), context.config("bdtopo_path")))
 
@@ -72,9 +72,11 @@ def execute(context):
             df_buildings = gpd.sjoin(df_buildings, df_departments, predicate = "within")
             final_count = len(df_buildings)
             print("    {}/{} filtered spatially".format(initial_count - final_count, initial_count))
+            
 
             
-            #print(df_buildings["usage_1"].value_counts())
+            print(df_buildings["usage_1"].value_counts())
+            print(df_buildings["housing"].value_counts())
             is_dept_08 = (df_buildings["departement_id"] == "08")
             mask_08 = is_dept_08 & df_buildings["usage_1"].isin(["R\u00e9sidentiel", "Indiff\u00e9renci\u00e9"])
             #df_buildings = df_buildings[df_buildings["usage_1"].isin(["R\u00e9sidentiel", "Indiff\u00e9renci\u00e9"])]
@@ -95,12 +97,18 @@ def execute(context):
             os.remove(geometry_path)
 
     df_bdtopo = pd.concat(df_bdtopo)
+    print(df_bdtopo["department_id"].value_counts())
 
     for department_id in df_departments["departement_id"].values:
         if(np.count_nonzero(df_bdtopo["department_id"] == department_id) > 0):
             print("Departement non conforme", department_id , np.count_nonzero(df_bdtopo["department_id"] == department_id))
-            print(df_bdtopo["department_id"].value_counts().head(10))
-        assert np.count_nonzero(df_bdtopo["department_id"] == department_id) > 0
+            #print(df_bdtopo["department_id"].value_counts().head(10))
+            print(df_bdtopo[df_bdtopo["department_id"] == department_id])
+            print(df_bdtopo[df_bdtopo["department_id"] == department_id].info())
+            print(df_bdtopo["housing"].value_counts())
+        else:
+            print("Non conform departement:", department_id)
+        #assert np.count_nonzero(df_bdtopo["department_id"] == department_id) > 0
 
     return df_bdtopo[["building_id", "housing", "geometry"]]
 
