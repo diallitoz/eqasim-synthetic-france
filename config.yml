@@ -17,8 +17,8 @@ config:
 
   # Define whether to use ENTD or EGT as the household travel survey (HTS)
   hts: mobisurvstd
-  mobisurvstd.path: /work/home/simulations/matsim/data/emc2/2018 - Gapen/lil-1340.csv
-  hts_sig_name: EDVM_SCOT_Gapenais_2018_DTIR.TAB
+  mobisurvstd.path: /work/home/simulations/matsim/data/emc2/2018 - Evreux/lil-1339.csv
+  hts_sig_name: EDVM_Evreux_DTIR.TAB
   filter_hts: False # Quit trips performed outside the HTS area
 
   activity_purposes: ["leisure", "shop", "escort", "task"]
@@ -29,7 +29,7 @@ config:
 
   # Paths to the input data and where the output should be stored
   data_path:  /work/home/simulations/matsim/data
-  output_path: /work/home/simulations/matsim/national/output_100p/2018_gapen
+  output_path: /work/home/simulations/matsim/national/output_100p/2018_evreux
 
   # Only interesting if you run the simulation
   java_memory: 128G
@@ -41,7 +41,7 @@ config:
   #income_assignation_method: bhepop2
 
   # IdF settings
-  output_prefix: gapen_
+  output_prefix: evreux_
   # gpkg format not adapted for 100% french demand
   output_formats: ["csv", "parquet", "geoparquet"]
   regions: []
@@ -52,7 +52,7 @@ config:
   #bdtopo_path: bdtopo_idf
   #bdtopo_path: bdtopo_dep08_2025
   #bdtopo_path: bdtopo_national
-  bdtopo_path: bdtopo_national_reg/93
+  bdtopo_path: bdtopo_national_reg/28
 
   #iris_path: iris_2023
 
