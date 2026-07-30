@@ -5,7 +5,8 @@ def configure(context):
     if hts == "mobisurvstd":
         context.stage("data.hts.mobisurvstd.filtered", alias = "hts")
     elif hts == "egt":
-        context.stage("data.hts.egt.filtered", alias = "hts")
+        #context.stage("data.hts.egt.filtered", alias = "hts")
+        context.stage("data.hts.egt.filtered_wkd", alias = "hts")
     elif hts == "entd":
         context.stage("data.hts.entd.reweighted", alias = "hts")
     elif hts == "edgt_lyon":
