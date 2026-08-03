@@ -16,7 +16,8 @@ config:
   processes: 64
 
   # Define whether to use ENTD or EGT as the household travel survey (HTS)
-  hts: egt
+  hts: mobisurvstd
+  mobisurvstd.path: /work/home/simulations/matsim/data/2018-2020 EGT/lil-1581-Donnees_CSV
 
   # Define sampling rate and random seed for the output population
   sampling_rate: 1
@@ -24,7 +25,7 @@ config:
 
   # Paths to the input data and where the output should be stored
   data_path:  /work/home/simulations/matsim/data
-  output_path: /work/home/simulations/matsim/national/output_100p/2010_egt_wkd
+  output_path: /work/home/simulations/matsim/national/output_100p/2018_2020_idf
 
   # Only interesting if you run the simulation
   java_memory: 164G
