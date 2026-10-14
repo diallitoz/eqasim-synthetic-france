@@ -16,8 +16,10 @@ def configure(context):
 
     context.config("random_seed")
     context.config("sampling_rate")
+    context.stage("data.spatial.iris")
 
 def execute(context):
+
     df_census = context.stage("source").sort_values(by = ["household_id", "person_id"]).copy()
 
     sampling_rate = context.config("sampling_rate")
@@ -58,4 +60,21 @@ def execute(context):
     df_census = df_census[selector]
 
     del df_census["weight"]
+
+    df_iris = context.stage("data.spatial.iris")
+    clean_iris = list(df_iris["iris_id"].cat.categories)
+    clean_communes = list(df_iris["commune_id"].cat.categories)
+
+    s_commune = df_census["commune_id"].astype(object).fillna("undefined")
+    s_commune = s_commune.replace({"nan": "undefined", "NaN": "undefined", "None": "undefined", "<NA>": "undefined", "": "undefined"})
+
+    s_iris = df_census["iris_id"].astype(object).fillna("undefined")
+    s_iris = s_iris.replace({"nan": "undefined", "NaN": "undefined", "None": "undefined", "<NA>": "undefined", "": "undefined"})
+
+    cat_commune = pd.CategoricalDtype(categories=clean_communes + ["undefined"], ordered=False)
+    cat_iris = pd.CategoricalDtype(categories=clean_iris + ["undefined"], ordered=False)
+
+    df_census["commune_id"] = s_commune.astype(cat_commune)
+    df_census["iris_id"] = s_iris.astype(cat_iris)
+
     return df_census

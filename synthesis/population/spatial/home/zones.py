@@ -28,8 +28,8 @@ def execute(context):
         "household_id", "commune_id", "iris_id", "departement_id", "housing_type"
     ]].copy().set_index("household_id")
 
-    f_has_commune = df_households["commune_id"] != "undefined"
-    f_has_iris = df_households["iris_id"] != "undefined"
+    f_has_commune = (df_households["commune_id"] != "undefined") & (df_households["commune_id"].notna())
+    f_has_iris = (df_households["iris_id"] != "undefined") & (df_households["iris_id"].notna())
 
     # Fix missing communes (we select from those without IRIS)
     df_municipalities = context.stage("data.spatial.municipalities").set_index("commune_id")
@@ -51,13 +51,11 @@ def execute(context):
         df_target = df_households[
             ~f_has_commune &
             (df_households["departement_id"] == departement_id)].copy()
-
         weights = df_candidates["population"].values.astype(float)
         weights /= np.sum(weights)
 
         indices = np.repeat(np.arange(weights.shape[0]), random.multinomial(len(df_target), weights))
         df_target["commune_id"] = df_candidates.reset_index()["commune_id"].iloc[indices].values
-
         df_households.loc[df_target.index, "commune_id"] = df_target["commune_id"]
 
     # Fix missing IRIS (we select from those with <200 inhabitants)
@@ -76,7 +74,7 @@ def execute(context):
         df_candidates = df_iris[
             (df_iris["population"] <= 200) &
             (df_iris["commune_id"].astype(str) == commune_id)]
-
+        
         df_target = df_households[
             f_has_commune & ~f_has_iris &
             (df_households["commune_id"] == commune_id)].copy()
@@ -89,13 +87,12 @@ def execute(context):
         df_target["iris_id"] = df_candidates.reset_index()["iris_id"].iloc[indices].values
 
         df_households.loc[df_target.index, "iris_id"] = df_target["iris_id"]
-
     # Check that everybody has a commune now
     assert np.count_nonzero(df_households["commune_id"] == "undefined") == 0
 
     # Now there are some people left who don't have an IRIS, because the commune
     # is not covered in IRIS. Hence, we drive the commune-based IRIS for them.
-    f = df_households["iris_id"] == "undefined"
+    f = (df_households["iris_id"] == "undefined") | (~df_households["iris_id"].notna())
     df_households.loc[f, "iris_id"] = df_households.loc[f, "commune_id"].astype(str) + "0000"
 
     # Finally, make sure that we have no invalid codes

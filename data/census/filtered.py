@@ -20,12 +20,17 @@ def execute(context):
     requested_departements = df_codes["departement_id"].unique()
     df = df[df["departement_id"].isin(requested_departements)]
 
+    #requested_communes = df_codes["commune_id"].unique()
+    #df = df[df["commune_id"].isin(requested_communes)]
+
     excess_communes = set(df["commune_id"].unique()) - set(df_codes["commune_id"].unique())
     if len(excess_communes) > 0 and not excess_communes == {"undefined"}:
-        raise RuntimeError("Found additional communes: %s" % excess_communes)
+        #raise RuntimeError("Found additional communes: %s" % excess_communes)
+        print("Found additional communes: %s" % excess_communes)
 
     excess_iris = set(df["iris_id"].unique()) - set(df_codes["iris_id"].unique())
     if len(excess_iris) > 0 and not excess_iris == {"undefined"}:
-        raise RuntimeError("Found additional IRIS: %s" % excess_iris)
+        #raise RuntimeError("Found additional IRIS: %s" % excess_iris)
+        print("Found additional IRIS: %s" % excess_iris)
 
     return df

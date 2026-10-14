@@ -16,5 +16,9 @@ def execute(context):
 
     df_municipalities = context.stage("data.spatial.iris").dissolve(
         by = "commune_id").drop(columns = ["iris_id"]).reset_index()
-
+    
+    clean_communes = list(df_iris["commune_id"].cat.categories)
+    df_municipalities["commune_id"] = df_municipalities["commune_id"].astype(
+        pd.CategoricalDtype(categories=clean_communes, ordered=False)
+    )
     return df_municipalities

@@ -23,6 +23,7 @@ dependencies = [
     "python-calamine>=0.6.2",
     "scikit-learn>=1.8.0",
     "scipy>=1.17.1",
+    "seaborn>=0.13.2",
     "shapely>=2.1.2",
     "synpp>=1.6.2",
     "tqdm>=4.67.3",

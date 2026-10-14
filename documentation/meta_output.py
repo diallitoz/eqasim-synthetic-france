@@ -9,7 +9,7 @@ def configure(context):
     context.config("output_path")
     context.config("output_prefix", "ile_de_france_")
 
-    for option in ("sampling_rate", "hts", "random_seed"):
+    for option in ("sampling_rate", "hts", "random_seed", "hts_year"):
         context.config(option)
 
 def get_version():
@@ -33,10 +33,17 @@ def execute(context):
     information = dict(
         sampling_rate = context.config("sampling_rate"),
         hts = context.config("hts"),
+        mobisurvstd_version = "1.1.0",
         random_seed = context.config("random_seed"),
         created = datetime.datetime.now(datetime.timezone.utc).isoformat(),
         version = get_version(),
-        commit = get_commit(context)
+        commit = get_commit(context),
+        eqasim_version= "1.5.0",
+        census_year= 2022,
+        iris_year= 2024,
+        bpe_year= 2024,
+        bd_topo_year= 2024,
+        hts_year= context.config("hts_year")
     )
 
     with open("%s/%smeta.json" % (context.config("output_path"), context.config("output_prefix")), "w+") as f:

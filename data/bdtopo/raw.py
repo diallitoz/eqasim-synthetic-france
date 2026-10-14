@@ -29,7 +29,7 @@ def get_department_string(department_id):
 
 def execute(context):
     df_departments = context.stage("data.spatial.departments")
-    print("Expecting data for {} departments".format(len(df_departments)))
+    print("Expecting data for {} departments".format(len(df_departments)), df_departments["departement_id"].astype(str).unique())
     
     source_paths = find_bdtopo("{}/{}".format(context.config("data_path"), context.config("bdtopo_path")))
     requested_departments = set(df_departments["departement_id"].astype(str).unique())
@@ -84,9 +84,12 @@ def execute(context):
             df_buildings = gpd.sjoin(df_buildings, df_departments, predicate = "within")
             final_count = len(df_buildings)
             print("    {}/{} filtered spatially".format(initial_count - final_count, initial_count))
-
+            
             # special fix for Ardennes
             fix_ardennes(df_buildings)
+
+            # special fix for La Haute-Saône
+            fix_la_haute_saone(df_buildings)
 
             initial_count = len(df_buildings)
             df_buildings = df_buildings[df_buildings["housing"] > 0]
@@ -128,6 +131,20 @@ def fix_ardennes(df_buildings):
 
     if np.count_nonzero(f) > 0:
         print("    ATTENTION: fixing missing information for Ardennes (08), assigning one housing unit to each building")
+        df_buildings.loc[f, "housing"] = 1
+
+def fix_la_haute_saone(df_buildings):
+    """
+    Attention: In La Haute-Saone (70) no information on the number of housing units is
+    available. To be sure that we don't throw away all buildings, we set the 
+    number of housing units to one by default. This has, however, implications
+    in later steps: All buildings are considered as residential candidates and
+    all buildings are weighted uniformly.
+    """
+    f = df_buildings["departement_id"] == "70"
+
+    if np.count_nonzero(f) > 0:
+        print("    ATTENTION: fixing missing information for La Haute-Saône (70), assigning one housing unit to each building")
         df_buildings.loc[f, "housing"] = 1
 
 def validate(context):
